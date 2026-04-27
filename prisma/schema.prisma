@@ -90,210 +90,225 @@ enum LinkedEntityType {
   CERTIFICATION_SUBMISSION
 }
 
-model Organization {
-  id                 String            @id @default(cuid())
-  name               String
-  taxId              String?
-  sector             String
-  headquartersCountry String
-  reportingCurrency  String
-  createdAt          DateTime          @default(now())
-  updatedAt          DateTime          @updatedAt
+enum QuestionnaireType {
+  VERBAL
+  NUMERIC
+}
 
-  users              User[]
-  facilities         Facility[]
-  reportingPeriods   ReportingPeriod[]
-  metricEntries      MetricEntry[]
-  evidence           Evidence[]
-  emissionCalculations EmissionCalculation[]
-  materialityTopics  MaterialityTopic[]
-  climateRisks       ClimateRisk[]
-  targets            Target[]
-  reports            Report[]
-  certifications     CertificationSubmission[]
-  auditLogs          AuditLog[]
+model Organization {
+  id                  String   @id @default(cuid())
+  name                String
+  taxId               String?
+  sector              String
+  headquartersCountry String
+  reportingCurrency   String
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  users                    User[]
+  facilities               Facility[]
+  reportingPeriods         ReportingPeriod[]
+  metricEntries            MetricEntry[]
+  evidence                 Evidence[]
+  emissionCalculations     EmissionCalculation[]
+  materialityTopics        MaterialityTopic[]
+  climateRisks             ClimateRisk[]
+  targets                  Target[]
+  reports                  Report[]
+  certifications           CertificationSubmission[]
+  questionnaireTopics      QuestionnaireTopic[]
+  questionnaires           Questionnaire[]
+  questionnaireSections    QuestionnaireSection[]
+  questionnaireSubsections QuestionnaireSubsection[]
+  questionnaireQuestions   QuestionnaireQuestion[]
+  questionnaireAnswers     QuestionnaireAnswer[]
+  auditLogs                AuditLog[]
 }
 
 model User {
-  id             String      @id @default(cuid())
+  id             String   @id @default(cuid())
   name           String
-  email          String      @unique
+  email          String   @unique
   password       String
   role           UserRole
   organizationId String
-  createdAt      DateTime    @default(now())
-  updatedAt      DateTime    @updatedAt
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  ownedMetricEntries MetricEntry[] @relation("MetricEntryOwner")
-  uploadedEvidence Evidence[] @relation("EvidenceUploader")
-  ownedRisks      ClimateRisk[] @relation("RiskOwner")
-  submittedCertifications CertificationSubmission[] @relation("CertificationSubmitter")
-  reviewedCertifications CertificationSubmission[] @relation("CertificationReviewer")
-  certificationComments CertificationComment[]
-  auditLogs      AuditLog[]
+  organization               Organization              @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  ownedMetricEntries         MetricEntry[]             @relation("MetricEntryOwner")
+  uploadedEvidence           Evidence[]                @relation("EvidenceUploader")
+  ownedRisks                 ClimateRisk[]             @relation("RiskOwner")
+  submittedCertifications    CertificationSubmission[] @relation("CertificationSubmitter")
+  reviewedCertifications     CertificationSubmission[] @relation("CertificationReviewer")
+  certificationComments      CertificationComment[]
+  questionnaireAnswers       QuestionnaireAnswer[]     @relation("QuestionnaireAnsweringUser")
+  questionnaireAnswerUpdates QuestionnaireAnswer[]     @relation("QuestionnaireUpdatedBy")
+  questionnaireAnswerDeletes QuestionnaireAnswer[]     @relation("QuestionnaireDeletedBy")
+  auditLogs                  AuditLog[]
 }
 
 model Facility {
-  id             String      @id @default(cuid())
+  id             String   @id @default(cuid())
   organizationId String
   name           String
   country        String
   city           String?
   facilityType   String
-  createdAt      DateTime    @default(now())
-  updatedAt      DateTime    @updatedAt
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  metricEntries  MetricEntry[]
+  organization         Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  metricEntries        MetricEntry[]
   emissionCalculations EmissionCalculation[]
-  climateRisks   ClimateRisk[]
+  climateRisks         ClimateRisk[]
 }
 
 model ReportingPeriod {
-  id             String               @id @default(cuid())
+  id             String                @id @default(cuid())
   organizationId String
   name           String
   startDate      DateTime
   endDate        DateTime
   status         ReportingPeriodStatus
-  createdAt      DateTime             @default(now())
-  updatedAt      DateTime             @updatedAt
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
 
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  metricEntries  MetricEntry[]
+  organization         Organization              @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  metricEntries        MetricEntry[]
   emissionCalculations EmissionCalculation[]
-  materialityTopics MaterialityTopic[]
-  climateRisks   ClimateRisk[]
-  targets        Target[]
-  reports        Report[]
-  certifications CertificationSubmission[]
+  materialityTopics    MaterialityTopic[]
+  climateRisks         ClimateRisk[]
+  targets              Target[]
+  reports              Report[]
+  certifications       CertificationSubmission[]
+  questionnaireAnswers QuestionnaireAnswer[]
 
   @@unique([organizationId, name])
 }
 
 model MetricDefinition {
-  id             String      @id @default(cuid())
-  code           String      @unique
-  name           String
-  category       String
-  unit           String
-  description    String?
-  isRequired     Boolean     @default(true)
-  sector         String?
+  id          String  @id @default(cuid())
+  code        String  @unique
+  name        String
+  category    String
+  unit        String
+  description String?
+  isRequired  Boolean @default(true)
+  sector      String?
 
-  metricEntries  MetricEntry[]
-  targets        Target[]
+  metricEntries MetricEntry[]
+  targets       Target[]
 }
 
 model MetricEntry {
-  id                 String           @id @default(cuid())
+  id                 String            @id @default(cuid())
   organizationId     String
   facilityId         String
   reportingPeriodId  String
   metricDefinitionId String
-  value              Decimal?         @db.Decimal(14, 4)
+  value              Decimal?          @db.Decimal(14, 4)
   unit               String
   status             MetricEntryStatus @default(NOT_STARTED)
   ownerUserId        String?
   notes              String?
-  createdAt          DateTime         @default(now())
-  updatedAt          DateTime         @updatedAt
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
 
-  organization       Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  facility           Facility     @relation(fields: [facilityId], references: [id], onDelete: Cascade)
-  reportingPeriod    ReportingPeriod @relation(fields: [reportingPeriodId], references: [id], onDelete: Cascade)
-  metricDefinition   MetricDefinition @relation(fields: [metricDefinitionId], references: [id], onDelete: Restrict)
-  ownerUser          User? @relation("MetricEntryOwner", fields: [ownerUserId], references: [id])
-  emissions          EmissionCalculation[]
+  organization     Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  facility         Facility              @relation(fields: [facilityId], references: [id], onDelete: Cascade)
+  reportingPeriod  ReportingPeriod       @relation(fields: [reportingPeriodId], references: [id], onDelete: Cascade)
+  metricDefinition MetricDefinition      @relation(fields: [metricDefinitionId], references: [id], onDelete: Restrict)
+  ownerUser        User?                 @relation("MetricEntryOwner", fields: [ownerUserId], references: [id])
+  emissions        EmissionCalculation[]
 
-  @@index([organizationId, reportingPeriodId])
   @@unique([facilityId, reportingPeriodId, metricDefinitionId])
+  @@index([organizationId, reportingPeriodId])
 }
 
 model Evidence {
-  id             String          @id @default(cuid())
-  organizationId String
+  id               String           @id @default(cuid())
+  organizationId   String
   linkedEntityType LinkedEntityType
-  linkedEntityId String
-  fileName       String
-  fileUrl        String
-  fileType       String
-  fileSize       Int
-  uploadedById   String
-  status         EvidenceStatus  @default(UPLOADED)
-  reviewerComment String?
-  createdAt      DateTime        @default(now())
-  updatedAt      DateTime        @updatedAt
+  linkedEntityId   String
+  fileName         String
+  fileUrl          String
+  fileType         String
+  fileSize         Int
+  uploadedById     String
+  status           EvidenceStatus   @default(UPLOADED)
+  reviewerComment  String?
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
 
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  uploadedBy     User @relation("EvidenceUploader", fields: [uploadedById], references: [id], onDelete: Restrict)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  uploadedBy   User         @relation("EvidenceUploader", fields: [uploadedById], references: [id], onDelete: Restrict)
 }
 
 model EmissionFactor {
-  id             String      @id @default(cuid())
-  name           String
-  country        String
-  activityUnit   String
-  factorValue    Decimal     @db.Decimal(12, 6)
-  factorUnit     String
-  source         String
-  versionYear    Int
-  scope          EmissionScope
-  category       String
-  createdAt      DateTime    @default(now())
-  updatedAt      DateTime    @updatedAt
+  id           String        @id @default(cuid())
+  name         String
+  country      String
+  activityUnit String
+  factorValue  Decimal       @db.Decimal(12, 6)
+  factorUnit   String
+  source       String
+  versionYear  Int
+  scope        EmissionScope
+  category     String
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
 
-  calculations   EmissionCalculation[]
+  calculations EmissionCalculation[]
 }
 
 model EmissionCalculation {
-  id               String      @id @default(cuid())
-  organizationId   String
-  facilityId       String
-  reportingPeriodId String
-  metricEntryId    String
-  emissionFactorId String
-  scope            EmissionScope
-  activityValue    Decimal     @db.Decimal(14, 4)
-  activityUnit     String
-  factorValue      Decimal     @db.Decimal(12, 6)
-  resultTCO2e      Decimal     @db.Decimal(14, 6)
+  id                 String        @id @default(cuid())
+  organizationId     String
+  facilityId         String
+  reportingPeriodId  String
+  metricEntryId      String
+  emissionFactorId   String
+  scope              EmissionScope
+  activityValue      Decimal       @db.Decimal(14, 4)
+  activityUnit       String
+  factorValue        Decimal       @db.Decimal(12, 6)
+  resultTCO2e        Decimal       @db.Decimal(14, 6)
   calculationFormula String
-  overrideReason   String?
-  createdAt        DateTime    @default(now())
-  updatedAt        DateTime    @updatedAt
+  overrideReason     String?
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
 
-  organization     Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  facility         Facility @relation(fields: [facilityId], references: [id], onDelete: Cascade)
-  reportingPeriod  ReportingPeriod @relation(fields: [reportingPeriodId], references: [id], onDelete: Cascade)
-  metricEntry      MetricEntry @relation(fields: [metricEntryId], references: [id], onDelete: Cascade)
-  emissionFactor   EmissionFactor @relation(fields: [emissionFactorId], references: [id], onDelete: Restrict)
+  organization    Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  facility        Facility        @relation(fields: [facilityId], references: [id], onDelete: Cascade)
+  reportingPeriod ReportingPeriod @relation(fields: [reportingPeriodId], references: [id], onDelete: Cascade)
+  metricEntry     MetricEntry     @relation(fields: [metricEntryId], references: [id], onDelete: Cascade)
+  emissionFactor  EmissionFactor  @relation(fields: [emissionFactorId], references: [id], onDelete: Restrict)
 }
 
 model MaterialityTopic {
-  id                       String    @id @default(cuid())
-  organizationId           String
-  reportingPeriodId        String
-  name                     String
-  category                 String
-  financialImpactScore     Int
-  impactSeverityScore      Int
-  likelihoodScore          Int
-  stakeholderConcernScore  Int
-  isMaterial               Boolean   @default(false)
-  notes                    String?
-  createdAt                DateTime  @default(now())
-  updatedAt                DateTime  @updatedAt
+  id                      String   @id @default(cuid())
+  organizationId          String
+  reportingPeriodId       String
+  name                    String
+  category                String
+  financialImpactScore    Int
+  impactSeverityScore     Int
+  likelihoodScore         Int
+  stakeholderConcernScore Int
+  isMaterial              Boolean  @default(false)
+  notes                   String?
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
 
-  organization             Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  reportingPeriod          ReportingPeriod @relation(fields: [reportingPeriodId], references: [id], onDelete: Cascade)
+  organization    Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  reportingPeriod ReportingPeriod @relation(fields: [reportingPeriodId], references: [id], onDelete: Cascade)
 
   @@unique([organizationId, reportingPeriodId, name])
 }
 
 model ClimateRisk {
-  id                      String        @id @default(cuid())
+  id                      String          @id @default(cuid())
   organizationId          String
   reportingPeriodId       String
   facilityId              String?
@@ -301,18 +316,18 @@ model ClimateRisk {
   type                    ClimateRiskType
   probability             String
   impact                  String
-  financialImpactEstimate Decimal?      @db.Decimal(14, 2)
+  financialImpactEstimate Decimal?        @db.Decimal(14, 2)
   ownerUserId             String?
   mitigationPlan          String?
   notes                   String?
-  createdAt               DateTime      @default(now())
-  updatedAt               DateTime      @updatedAt
+  createdAt               DateTime        @default(now())
+  updatedAt               DateTime        @updatedAt
 
-  organization            Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  reportingPeriod         ReportingPeriod @relation(fields: [reportingPeriodId], references: [id], onDelete: Cascade)
-  facility                Facility? @relation(fields: [facilityId], references: [id], onDelete: SetNull)
-  ownerUser               User? @relation("RiskOwner", fields: [ownerUserId], references: [id], onDelete: SetNull)
-  scenarios               ScenarioAnalysis[]
+  organization    Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  reportingPeriod ReportingPeriod    @relation(fields: [reportingPeriodId], references: [id], onDelete: Cascade)
+  facility        Facility?          @relation(fields: [facilityId], references: [id], onDelete: SetNull)
+  ownerUser       User?              @relation("RiskOwner", fields: [ownerUserId], references: [id], onDelete: SetNull)
+  scenarios       ScenarioAnalysis[]
 }
 
 model ScenarioAnalysis {
@@ -327,7 +342,7 @@ model ScenarioAnalysis {
   createdAt                     DateTime @default(now())
   updatedAt                     DateTime @updatedAt
 
-  climateRisk                   ClimateRisk @relation(fields: [climateRiskId], references: [id], onDelete: Cascade)
+  climateRisk ClimateRisk @relation(fields: [climateRiskId], references: [id], onDelete: Cascade)
 }
 
 model Target {
@@ -345,29 +360,29 @@ model Target {
   createdAt          DateTime     @default(now())
   updatedAt          DateTime     @updatedAt
 
-  organization       Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  reportingPeriod    ReportingPeriod @relation(fields: [reportingPeriodId], references: [id], onDelete: Cascade)
-  metricDefinition   MetricDefinition @relation(fields: [metricDefinitionId], references: [id], onDelete: Restrict)
+  organization     Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  reportingPeriod  ReportingPeriod  @relation(fields: [reportingPeriodId], references: [id], onDelete: Cascade)
+  metricDefinition MetricDefinition @relation(fields: [metricDefinitionId], references: [id], onDelete: Restrict)
 }
 
 model Report {
-  id                 String        @id @default(cuid())
+  id                 String          @id @default(cuid())
   organizationId     String
   reportingPeriodId  String
   framework          ReportFramework
-  status             ReportStatus  @default(DRAFT)
+  status             ReportStatus    @default(DRAFT)
   governanceText     String?
   strategyText       String?
   riskManagementText String?
   metricsTargetsText String?
   generatedAt        DateTime?
   submittedAt        DateTime?
-  createdAt          DateTime      @default(now())
-  updatedAt          DateTime      @updatedAt
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
 
-  organization       Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  reportingPeriod    ReportingPeriod @relation(fields: [reportingPeriodId], references: [id], onDelete: Cascade)
-  certifications     CertificationSubmission[]
+  organization    Organization              @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  reportingPeriod ReportingPeriod           @relation(fields: [reportingPeriodId], references: [id], onDelete: Cascade)
+  certifications  CertificationSubmission[]
 }
 
 model CertificationSubmission {
@@ -384,25 +399,150 @@ model CertificationSubmission {
   createdAt         DateTime            @default(now())
   updatedAt         DateTime            @updatedAt
 
-  organization      Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  reportingPeriod   ReportingPeriod @relation(fields: [reportingPeriodId], references: [id], onDelete: Cascade)
-  report            Report @relation(fields: [reportId], references: [id], onDelete: Cascade)
-  submittedBy       User? @relation("CertificationSubmitter", fields: [submittedById], references: [id], onDelete: SetNull)
-  reviewedBy        User? @relation("CertificationReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
-  comments          CertificationComment[]
+  organization    Organization           @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  reportingPeriod ReportingPeriod        @relation(fields: [reportingPeriodId], references: [id], onDelete: Cascade)
+  report          Report                 @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  submittedBy     User?                  @relation("CertificationSubmitter", fields: [submittedById], references: [id], onDelete: SetNull)
+  reviewedBy      User?                  @relation("CertificationReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+  comments        CertificationComment[]
 }
 
 model CertificationComment {
-  id                         String   @id @default(cuid())
-  certificationSubmissionId  String
-  authorUserId               String
-  comment                    String
-  linkedEntityType           LinkedEntityType?
-  linkedEntityId             String?
-  createdAt                  DateTime @default(now())
+  id                        String            @id @default(cuid())
+  certificationSubmissionId String
+  authorUserId              String
+  comment                   String
+  linkedEntityType          LinkedEntityType?
+  linkedEntityId            String?
+  createdAt                 DateTime          @default(now())
 
-  certificationSubmission    CertificationSubmission @relation(fields: [certificationSubmissionId], references: [id], onDelete: Cascade)
-  authorUser                 User @relation(fields: [authorUserId], references: [id], onDelete: Restrict)
+  certificationSubmission CertificationSubmission @relation(fields: [certificationSubmissionId], references: [id], onDelete: Cascade)
+  authorUser              User                    @relation(fields: [authorUserId], references: [id], onDelete: Restrict)
+}
+
+model QuestionnaireTopic {
+  id             String   @id @default(cuid())
+  organizationId String
+  name_tr        String
+  name_en        String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization            @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  questions    QuestionnaireQuestion[]
+
+  @@unique([organizationId, name_tr])
+}
+
+model Questionnaire {
+  id             String            @id @default(cuid())
+  organizationId String
+  name_tr        String
+  name_en        String?
+  type           QuestionnaireType
+  description    String?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  organization Organization            @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  sections     QuestionnaireSection[]
+  questions    QuestionnaireQuestion[]
+  answers      QuestionnaireAnswer[]
+
+  @@unique([organizationId, name_tr])
+}
+
+model QuestionnaireSection {
+  id              String   @id @default(cuid())
+  organizationId  String
+  questionnaireId String
+  name            String
+  orderIndex      Int      @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  organization  Organization              @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  questionnaire Questionnaire             @relation(fields: [questionnaireId], references: [id], onDelete: Cascade)
+  subsections   QuestionnaireSubsection[]
+  questions     QuestionnaireQuestion[]
+
+  @@unique([questionnaireId, name])
+}
+
+model QuestionnaireSubsection {
+  id                     String   @id @default(cuid())
+  organizationId         String
+  questionnaireSectionId String
+  name                   String
+  orderIndex             Int      @default(0)
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  organization         Organization            @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  questionnaireSection QuestionnaireSection    @relation(fields: [questionnaireSectionId], references: [id], onDelete: Cascade)
+  questions            QuestionnaireQuestion[]
+
+  @@unique([questionnaireSectionId, name])
+}
+
+model QuestionnaireQuestion {
+  id                        String   @id @default(cuid())
+  organizationId            String
+  questionnaireId           String
+  questionnaireSectionId    String?
+  questionnaireSubsectionId String?
+  questionnaireTopicId      String?
+  section                   String
+  code                      String?
+  title                     String
+  question_text             String
+  unit                      String?
+  owner_name                String?
+  owner_department          String?
+  owner_email               String?
+  helper                    String?
+  example                   String?
+  reminder                  String?
+  video_link                String?
+  sourceSheet               String?
+  sourceRowNumber           Int?
+  created_datetime          DateTime @default(now())
+  updated_datetime          DateTime @updatedAt
+
+  organization            Organization             @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  questionnaire           Questionnaire            @relation(fields: [questionnaireId], references: [id], onDelete: Cascade)
+  questionnaireSection    QuestionnaireSection?    @relation(fields: [questionnaireSectionId], references: [id], onDelete: SetNull)
+  questionnaireSubsection QuestionnaireSubsection? @relation(fields: [questionnaireSubsectionId], references: [id], onDelete: SetNull)
+  questionnaireTopic      QuestionnaireTopic?      @relation(fields: [questionnaireTopicId], references: [id], onDelete: SetNull)
+  answers                 QuestionnaireAnswer[]
+}
+
+model QuestionnaireAnswer {
+  id                      String    @id @default(cuid())
+  organizationId          String
+  questionnaireId         String
+  questionnaireQuestionId String
+  reportingPeriodId       String
+  answer_text             String?
+  answer_number           Decimal?  @db.Decimal(18, 4)
+  answering_user_id       String
+  answering_timestamp     DateTime  @default(now())
+  updated_by_id           String?
+  updated_timestamp       DateTime?
+  deleted_by_id           String?
+  deleted_timestamp       DateTime?
+  createdAt               DateTime  @default(now())
+
+  organization          Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  questionnaire         Questionnaire         @relation(fields: [questionnaireId], references: [id], onDelete: Cascade)
+  questionnaireQuestion QuestionnaireQuestion @relation(fields: [questionnaireQuestionId], references: [id], onDelete: Cascade)
+  reportingPeriod       ReportingPeriod       @relation(fields: [reportingPeriodId], references: [id], onDelete: Cascade)
+  answeringUser         User                  @relation("QuestionnaireAnsweringUser", fields: [answering_user_id], references: [id], onDelete: Restrict)
+  updatedBy             User?                 @relation("QuestionnaireUpdatedBy", fields: [updated_by_id], references: [id], onDelete: SetNull)
+  deletedBy             User?                 @relation("QuestionnaireDeletedBy", fields: [deleted_by_id], references: [id], onDelete: SetNull)
+
+  @@unique([questionnaireQuestionId, reportingPeriodId])
+  @@index([organizationId, questionnaireId])
 }
 
 model AuditLog {
@@ -416,8 +556,8 @@ model AuditLog {
   afterValueJson  Json?
   createdAt       DateTime @default(now())
 
-  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  user            User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
 
   @@index([organizationId, createdAt])
 }

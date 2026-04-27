@@ -1,7 +1,47 @@
-import { PrismaClient, UserRole, ReportingPeriodStatus, MetricEntryStatus, EvidenceStatus, EmissionScope, ClimateRiskType, TargetStatus, ReportFramework, ReportStatus, CertificationStatus, LinkedEntityType } from "@prisma/client";
+import fs from "node:fs";
+import path from "node:path";
+import {
+  CertificationStatus,
+  ClimateRiskType,
+  EmissionScope,
+  EvidenceStatus,
+  LinkedEntityType,
+  MetricEntryStatus,
+  PrismaClient,
+  QuestionnaireType,
+  ReportFramework,
+  ReportStatus,
+  ReportingPeriodStatus,
+  TargetStatus,
+  UserRole,
+} from "@prisma/client";
 import { hashSync } from "bcryptjs";
 
 const prisma = new PrismaClient();
+
+type QuestionnaireSeedData = Array<{
+  nameTr: string;
+  nameEn?: string;
+  type: "VERBAL" | "NUMERIC";
+  sections: Array<{
+    name: string;
+    subsections: Array<{
+      name: string;
+      questions: Array<{
+        section: string;
+        topic?: string;
+        code?: string;
+        title: string;
+        questionText: string;
+        unit?: string;
+        owner_department?: string;
+        helper?: string;
+        sourceSheet?: string;
+        sourceRowNumber?: number;
+      }>;
+    }>;
+  }>;
+}>;
 
 const metricDefinitions = [
   { code: "electricity_consumption", name: "Electricity consumption", category: "Energy", unit: "kWh", isRequired: true },
@@ -30,6 +70,109 @@ const materialityTopics = [
   "Community impact",
 ];
 
+async function seedQuestionnaires(params: {
+  organizationId: string;
+  reportingPeriodId: string;
+  managerId: string;
+}) {
+  const filePath = path.join(process.cwd(), "prisma", "data", "questionnaires.json");
+  const parsed = JSON.parse(fs.readFileSync(filePath, "utf8")) as QuestionnaireSeedData;
+
+  for (const template of parsed) {
+    const questionnaire = await prisma.questionnaire.create({
+      data: {
+        organizationId: params.organizationId,
+        name_tr: template.nameTr,
+        name_en: template.nameEn,
+        type: template.type as QuestionnaireType,
+        description: template.type === "NUMERIC" ? "Numeric questionnaire template" : "Verbal questionnaire template",
+      },
+    });
+
+    for (let secIdx = 0; secIdx < template.sections.length; secIdx += 1) {
+      const sec = template.sections[secIdx];
+      const section = await prisma.questionnaireSection.create({
+        data: {
+          organizationId: params.organizationId,
+          questionnaireId: questionnaire.id,
+          name: sec.name,
+          orderIndex: secIdx,
+        },
+      });
+
+      for (let subIdx = 0; subIdx < sec.subsections.length; subIdx += 1) {
+        const sub = sec.subsections[subIdx];
+        const subsection = await prisma.questionnaireSubsection.create({
+          data: {
+            organizationId: params.organizationId,
+            questionnaireSectionId: section.id,
+            name: sub.name,
+            orderIndex: subIdx,
+          },
+        });
+
+        for (const q of sub.questions) {
+          const topic = q.topic
+            ? await prisma.questionnaireTopic.upsert({
+                where: {
+                  organizationId_name_tr: {
+                    organizationId: params.organizationId,
+                    name_tr: q.topic,
+                  },
+                },
+                create: {
+                  organizationId: params.organizationId,
+                  name_tr: q.topic,
+                  name_en: q.topic,
+                },
+                update: {},
+              })
+            : null;
+
+          const question = await prisma.questionnaireQuestion.create({
+            data: {
+              organizationId: params.organizationId,
+              questionnaireId: questionnaire.id,
+              questionnaireSectionId: section.id,
+              questionnaireSubsectionId: subsection.id,
+              questionnaireTopicId: topic?.id,
+              section: q.section,
+              code: q.code || null,
+              title: q.title,
+              question_text: q.questionText,
+              unit: q.unit || null,
+              owner_name: null,
+              owner_department: q.owner_department || null,
+              owner_email: null,
+              helper: q.helper || null,
+              example: null,
+              reminder: null,
+              video_link: null,
+              sourceSheet: q.sourceSheet || section.name,
+              sourceRowNumber: q.sourceRowNumber || null,
+            },
+          });
+
+          if (Math.random() < 0.12) {
+            await prisma.questionnaireAnswer.create({
+              data: {
+                organizationId: params.organizationId,
+                questionnaireId: questionnaire.id,
+                questionnaireQuestionId: question.id,
+                reportingPeriodId: params.reportingPeriodId,
+                answer_text: template.type === "VERBAL" ? "Demo yanıt" : null,
+                answer_number: template.type === "NUMERIC" ? 100 : null,
+                answering_user_id: params.managerId,
+                answering_timestamp: new Date(),
+              },
+            });
+          }
+        }
+      }
+    }
+  }
+}
+
 async function main() {
   await prisma.auditLog.deleteMany();
   await prisma.certificationComment.deleteMany();
@@ -43,6 +186,12 @@ async function main() {
   await prisma.evidence.deleteMany();
   await prisma.metricEntry.deleteMany();
   await prisma.emissionFactor.deleteMany();
+  await prisma.questionnaireAnswer.deleteMany();
+  await prisma.questionnaireQuestion.deleteMany();
+  await prisma.questionnaireSubsection.deleteMany();
+  await prisma.questionnaireSection.deleteMany();
+  await prisma.questionnaire.deleteMany();
+  await prisma.questionnaireTopic.deleteMany();
   await prisma.metricDefinition.deleteMany();
   await prisma.reportingPeriod.deleteMany();
   await prisma.facility.deleteMany();
@@ -294,6 +443,12 @@ async function main() {
     },
   });
 
+  await seedQuestionnaires({
+    organizationId: org.id,
+    reportingPeriodId: period.id,
+    managerId: manager.id,
+  });
+
   await prisma.auditLog.createMany({
     data: [
       {
@@ -319,6 +474,14 @@ async function main() {
         entityType: "CertificationSubmission",
         entityId: cert.id,
         afterValueJson: { status: CertificationStatus.UNDER_REVIEW },
+      },
+      {
+        organizationId: org.id,
+        userId: manager.id,
+        action: "QUESTIONNAIRE_SEED_IMPORTED",
+        entityType: "Questionnaire",
+        entityId: org.id,
+        afterValueJson: { source: "Kimya questionnaires" },
       },
     ],
   });

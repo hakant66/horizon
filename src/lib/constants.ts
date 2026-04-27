@@ -1,15 +1,16 @@
 export const NAV_ITEMS = [
-  { href: "/dashboard", label: "Home" },
-  { href: "/setup", label: "Setup" },
-  { href: "/materiality", label: "Materiality" },
-  { href: "/data-collection", label: "Data Collection" },
-  { href: "/emissions", label: "Emissions" },
-  { href: "/risks", label: "Risks & Scenarios" },
-  { href: "/targets", label: "Targets" },
-  { href: "/reports", label: "Reports" },
-  { href: "/certification", label: "Certification" },
-  { href: "/audit-trail", label: "Audit Trail" },
-  { href: "/settings", label: "Settings" },
+  { href: "/dashboard", labelKey: "home" },
+  { href: "/setup", labelKey: "setup" },
+  { href: "/questionnaire", labelKey: "questionnaire" },
+  { href: "/materiality", labelKey: "materiality" },
+  { href: "/data-collection", labelKey: "dataCollection" },
+  { href: "/emissions", labelKey: "emissions" },
+  { href: "/risks", labelKey: "risks" },
+  { href: "/targets", labelKey: "targets" },
+  { href: "/reports", labelKey: "reports" },
+  { href: "/certification", labelKey: "certification" },
+  { href: "/audit-trail", labelKey: "auditTrail" },
+  { href: "/settings", labelKey: "settings" },
 ] as const;
 
 export const MATERIALITY_TOPICS = [

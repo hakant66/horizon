@@ -5,8 +5,13 @@ Workflow-first sustainability reporting and certification platform for companies
 ## What Is Included
 
 - Multi-tenant data model with organization-level isolation
+- TR-first multilingual UI (`Türkçe` default, switchable to English)
 - Role-based auth (Admin, Sustainability Manager, Data Contributor, Finance Reviewer, Auditor)
 - Setup wizard (organization, facilities, users, reporting period)
+- Questionnaire module
+- Questionnaire Setup (topics, questionnaires, sections, subsections, question CRUD)
+- Questionnaire Answers (capture answer + answering user + timestamps, update/delete tracking)
+- Questionnaire Dashboard (answered/remaining/progress)
 - Materiality scoring + matrix
 - Data collection table + evidence upload
 - Scope 1/2 emissions calculation and transparent formula detail
@@ -154,4 +159,6 @@ Also seeds:
 - Target
 - Report + certification sample + comments
 - Audit logs
-
+- Two questionnaire templates imported from the provided Kimya (Chemical Sector) verbal/numeric Excel sets:
+  - `Kimya Sektörü Sözel Soru Seti`
+  - `Kimya Sektörü Sayısal Soru Seti`

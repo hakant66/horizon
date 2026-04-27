@@ -5,6 +5,7 @@ import {
   ReportFramework,
   CertificationStatus,
   EvidenceStatus,
+  QuestionnaireType,
   UserRole,
 } from "@prisma/client";
 
@@ -146,4 +147,61 @@ export const commentSchema = z.object({
     .enum(["METRIC_ENTRY", "EMISSION_CALCULATION", "CLIMATE_RISK", "REPORT", "CERTIFICATION_SUBMISSION"])
     .optional(),
   linkedEntityId: z.string().optional(),
+});
+
+export const questionnaireTopicSchema = z.object({
+  id: z.string().optional(),
+  name_tr: z.string().min(2),
+  name_en: z.string().optional().nullable(),
+});
+
+export const questionnaireSchema = z.object({
+  id: z.string().optional(),
+  name_tr: z.string().min(2),
+  name_en: z.string().optional().nullable(),
+  type: z.nativeEnum(QuestionnaireType),
+  description: z.string().optional().nullable(),
+});
+
+export const questionnaireSectionSchema = z.object({
+  id: z.string().optional(),
+  questionnaireId: z.string(),
+  name: z.string().min(2),
+  orderIndex: z.coerce.number().int().optional(),
+});
+
+export const questionnaireSubsectionSchema = z.object({
+  id: z.string().optional(),
+  questionnaireSectionId: z.string(),
+  name: z.string().min(2),
+  orderIndex: z.coerce.number().int().optional(),
+});
+
+export const questionnaireQuestionSchema = z.object({
+  id: z.string().optional(),
+  questionnaireId: z.string(),
+  questionnaireSectionId: z.string().optional().nullable(),
+  questionnaireSubsectionId: z.string().optional().nullable(),
+  questionnaireTopicId: z.string().optional().nullable(),
+  section: z.string().min(1),
+  code: z.string().optional().nullable(),
+  title: z.string().min(1),
+  question_text: z.string().min(1),
+  unit: z.string().optional().nullable(),
+  owner_name: z.string().optional().nullable(),
+  owner_department: z.string().optional().nullable(),
+  owner_email: z.string().email().optional().nullable(),
+  helper: z.string().optional().nullable(),
+  example: z.string().optional().nullable(),
+  reminder: z.string().optional().nullable(),
+  video_link: z.string().url().optional().nullable(),
+});
+
+export const questionnaireAnswerSchema = z.object({
+  id: z.string().optional(),
+  questionnaireId: z.string(),
+  questionnaireQuestionId: z.string(),
+  reportingPeriodId: z.string(),
+  answer_text: z.string().optional().nullable(),
+  answer_number: z.coerce.number().optional().nullable(),
 });

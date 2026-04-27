@@ -1,0 +1,584 @@
+"use client";
+
+import { useMemo, useState } from "react";
+import { QuestionnaireType } from "@prisma/client";
+import { useI18n } from "@/components/providers/LanguageProvider";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { PageHeader } from "@/components/domain/PageHeader";
+import { ProgressBar } from "@/components/domain/ProgressBar";
+import { DataTable } from "@/components/domain/DataTable";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+
+type Topic = { id: string; name_tr: string; name_en: string | null };
+type Question = {
+  id: string;
+  questionnaireId: string;
+  title: string;
+  question_text: string;
+  section: string;
+  unit: string | null;
+  owner_name: string | null;
+  owner_department: string | null;
+  owner_email: string | null;
+  helper: string | null;
+  example: string | null;
+  reminder: string | null;
+  video_link: string | null;
+  questionnaireSectionId: string | null;
+  questionnaireSubsectionId: string | null;
+};
+type Subsection = { id: string; name: string; questions: Question[] };
+type Section = { id: string; name: string; subsections: Subsection[]; questions: Question[] };
+type Questionnaire = {
+  id: string;
+  name_tr: string;
+  name_en: string | null;
+  type: QuestionnaireType;
+  sections: Section[];
+  answers: { id: string }[];
+};
+type Answer = {
+  id: string;
+  questionnaireQuestionId: string;
+  answer_text: string | null;
+  answer_number: string | null;
+};
+
+type Tab = "setup" | "answers" | "dashboard";
+
+export function QuestionnaireWorkspaceClient({
+  reportingPeriodId,
+  initialTopics,
+  initialQuestionnaires,
+  initialAnswers,
+  initialDashboard,
+}: {
+  reportingPeriodId: string;
+  initialTopics: Topic[];
+  initialQuestionnaires: Questionnaire[];
+  initialAnswers: Answer[];
+  initialDashboard: { totalQuestions: number; answered: number; remaining: number; progress: number };
+}) {
+  const { locale, t } = useI18n();
+  const [tab, setTab] = useState<Tab>("setup");
+  const [topics, setTopics] = useState(initialTopics);
+  const [questionnaires, setQuestionnaires] = useState(initialQuestionnaires);
+  const [answers, setAnswers] = useState(initialAnswers);
+  const [dashboard, setDashboard] = useState(initialDashboard);
+  const [message, setMessage] = useState("");
+
+  const [selectedQuestionnaireId, setSelectedQuestionnaireId] = useState(initialQuestionnaires[0]?.id || "");
+
+  const selectedQuestionnaire = useMemo(
+    () => questionnaires.find((q) => q.id === selectedQuestionnaireId) || questionnaires[0],
+    [questionnaires, selectedQuestionnaireId],
+  );
+
+  const selectedQuestions = useMemo(
+    () =>
+      (selectedQuestionnaire?.sections || [])
+        .flatMap((s) => s.subsections.flatMap((ss) => ss.questions))
+        .concat((selectedQuestionnaire?.sections || []).flatMap((s) => s.questions)),
+    [selectedQuestionnaire],
+  );
+
+  const answerMap = useMemo(() => {
+    const map = new Map<string, Answer>();
+    for (const answer of answers) map.set(answer.questionnaireQuestionId, answer);
+    return map;
+  }, [answers]);
+
+  async function refreshAll() {
+    if (!selectedQuestionnaireId) return;
+    const [setupRes, answersRes, dashboardRes] = await Promise.all([
+      fetch(`/api/questionnaire/setup?questionnaireId=${selectedQuestionnaireId}`),
+      fetch(`/api/questionnaire/answers?questionnaireId=${selectedQuestionnaireId}&reportingPeriodId=${reportingPeriodId}`),
+      fetch(`/api/questionnaire/dashboard?questionnaireId=${selectedQuestionnaireId}&reportingPeriodId=${reportingPeriodId}`),
+    ]);
+
+    if (setupRes.ok) {
+      const json = (await setupRes.json()) as { topics: Topic[]; questionnaires: Questionnaire[] };
+      setTopics(json.topics);
+      setQuestionnaires(json.questionnaires);
+    }
+    if (answersRes.ok) {
+      const json = (await answersRes.json()) as Answer[];
+      setAnswers(
+        json.map((row) => ({
+          ...row,
+          answer_number: (row.answer_number as unknown as string | null) || null,
+        })),
+      );
+    }
+    if (dashboardRes.ok) {
+      const json = (await dashboardRes.json()) as typeof initialDashboard;
+      setDashboard(json);
+    }
+  }
+
+  async function setupMutation(entityType: string, payload: unknown, method: "POST" | "PATCH" | "DELETE") {
+    const res = await fetch("/api/questionnaire/setup", {
+      method,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(method === "DELETE" ? payload : { entityType, payload }),
+    });
+    setMessage(res.ok ? (locale === "tr" ? "İşlem başarılı" : "Operation successful") : locale === "tr" ? "İşlem başarısız" : "Operation failed");
+    if (res.ok) await refreshAll();
+  }
+
+  async function saveAnswer(questionId: string, rawText: string, rawNumber: string) {
+    if (!selectedQuestionnaireId) return;
+    const payload = {
+      questionnaireId: selectedQuestionnaireId,
+      questionnaireQuestionId: questionId,
+      reportingPeriodId,
+      answer_text: rawText || null,
+      answer_number: rawNumber ? Number(rawNumber) : null,
+    };
+
+    const res = await fetch("/api/questionnaire/answers", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    setMessage(res.ok ? (locale === "tr" ? "Yanıt kaydedildi" : "Answer saved") : locale === "tr" ? "Yanıt kaydedilemedi" : "Answer save failed");
+    if (res.ok) await refreshAll();
+  }
+
+  async function deleteAnswer(answerId: string) {
+    const res = await fetch("/api/questionnaire/answers", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: answerId }),
+    });
+    setMessage(res.ok ? (locale === "tr" ? "Yanıt silindi" : "Answer deleted") : locale === "tr" ? "Silme başarısız" : "Delete failed");
+    if (res.ok) await refreshAll();
+  }
+
+  return (
+    <div className="space-y-4">
+      <PageHeader
+        title={t("questionnaire")}
+        description={
+          locale === "tr"
+            ? "Anket kurulumunu yönetin, yanıtları toplayın ve ilerlemeyi takip edin."
+            : "Manage questionnaire setup, collect answers, and track progress."
+        }
+      />
+
+      <div className="flex gap-2">
+        <Button variant={tab === "setup" ? "default" : "outline"} onClick={() => setTab("setup")}>
+          {t("questionnaireSetup")}
+        </Button>
+        <Button variant={tab === "answers" ? "default" : "outline"} onClick={() => setTab("answers")}>
+          {t("questionnaireAnswers")}
+        </Button>
+        <Button variant={tab === "dashboard" ? "default" : "outline"} onClick={() => setTab("dashboard")}>
+          {t("questionnaireDashboard")}
+        </Button>
+      </div>
+
+      {message ? <p className="text-sm text-slate-600">{message}</p> : null}
+
+      <div className="rounded-lg border border-slate-200 bg-white p-4">
+        <label className="mb-1 block text-sm font-medium">{locale === "tr" ? "Anket Seçimi" : "Select Questionnaire"}</label>
+        <select
+          className="h-9 rounded-md border border-slate-300 px-3 text-sm"
+          value={selectedQuestionnaireId}
+          onChange={(e) => {
+            setSelectedQuestionnaireId(e.target.value);
+            void setTimeout(refreshAll, 0);
+          }}
+        >
+          {questionnaires.map((q) => (
+            <option key={q.id} value={q.id}>
+              {locale === "tr" ? q.name_tr : q.name_en || q.name_tr}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      {tab === "setup" ? (
+        <div className="grid gap-4 lg:grid-cols-2">
+          <Card>
+            <CardHeader>
+              <CardTitle>{locale === "tr" ? "Konular" : "Topics"}</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              <form
+                className="flex gap-2"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  const formData = new FormData(e.currentTarget);
+                  void setupMutation(
+                    "topic",
+                    {
+                      name_tr: String(formData.get("name_tr") || ""),
+                      name_en: String(formData.get("name_en") || "") || null,
+                    },
+                    "POST",
+                  );
+                  e.currentTarget.reset();
+                }}
+              >
+                <Input name="name_tr" placeholder="Konu (TR)" required />
+                <Input name="name_en" placeholder="Topic (EN)" />
+                <Button type="submit">+</Button>
+              </form>
+              {topics.map((topic) => (
+                <div key={topic.id} className="flex items-center justify-between rounded border border-slate-200 p-2 text-sm">
+                  <span>{topic.name_tr}</span>
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        const next = window.prompt(locale === "tr" ? "Yeni konu adı" : "New topic name", topic.name_tr);
+                        if (!next) return;
+                        void setupMutation("topic", { id: topic.id, name_tr: next, name_en: topic.name_en }, "PATCH");
+                      }}
+                    >
+                      {locale === "tr" ? "Düzenle" : "Edit"}
+                    </Button>
+                    <Button size="sm" variant="destructive" onClick={() => void setupMutation("topic", { entityType: "topic", id: topic.id }, "DELETE")}>
+                      {locale === "tr" ? "Sil" : "Delete"}
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>{locale === "tr" ? "Anketler" : "Questionnaires"}</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              <form
+                className="space-y-2"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  const formData = new FormData(e.currentTarget);
+                  void setupMutation(
+                    "questionnaire",
+                    {
+                      name_tr: String(formData.get("name_tr") || ""),
+                      name_en: String(formData.get("name_en") || "") || null,
+                      type: String(formData.get("type") || "VERBAL"),
+                      description: String(formData.get("description") || "") || null,
+                    },
+                    "POST",
+                  );
+                  e.currentTarget.reset();
+                }}
+              >
+                <Input name="name_tr" placeholder="Anket adı (TR)" required />
+                <Input name="name_en" placeholder="Questionnaire name (EN)" />
+                <select name="type" className="h-9 rounded-md border border-slate-300 px-3 text-sm">
+                  <option value="VERBAL">VERBAL</option>
+                  <option value="NUMERIC">NUMERIC</option>
+                </select>
+                <Textarea name="description" placeholder={locale === "tr" ? "Açıklama" : "Description"} />
+                <Button type="submit">{locale === "tr" ? "Anket Oluştur" : "Create Questionnaire"}</Button>
+              </form>
+
+              <DataTable
+                data={questionnaires}
+                columns={[
+                  {
+                    key: "name",
+                    header: locale === "tr" ? "Ad" : "Name",
+                    render: (row) => (locale === "tr" ? row.name_tr : row.name_en || row.name_tr),
+                  },
+                  { key: "type", header: "Type", render: (row) => row.type },
+                  {
+                    key: "count",
+                    header: locale === "tr" ? "Soru Sayısı" : "Question Count",
+                    render: (row) => row.sections.flatMap((s) => s.subsections.flatMap((ss) => ss.questions)).length,
+                  },
+                  {
+                    key: "actions",
+                    header: locale === "tr" ? "İşlemler" : "Actions",
+                    render: (row) => (
+                      <Button size="sm" variant="destructive" onClick={() => void setupMutation("questionnaire", { entityType: "questionnaire", id: row.id }, "DELETE")}>
+                        {locale === "tr" ? "Sil" : "Delete"}
+                      </Button>
+                    ),
+                  },
+                ]}
+              />
+            </CardContent>
+          </Card>
+
+          <Card className="lg:col-span-2">
+            <CardHeader>
+              <CardTitle>{locale === "tr" ? "Bölüm / Alt Bölüm / Soru Yönetimi" : "Section / Subsection / Question Management"}</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {selectedQuestionnaire ? (
+                <>
+                  <div className="grid gap-2 md:grid-cols-3">
+                    <form
+                      className="flex gap-2"
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        const fd = new FormData(e.currentTarget);
+                        void setupMutation(
+                          "section",
+                          { questionnaireId: selectedQuestionnaire.id, name: String(fd.get("section_name") || "") },
+                          "POST",
+                        );
+                        e.currentTarget.reset();
+                      }}
+                    >
+                      <Input name="section_name" placeholder={locale === "tr" ? "Yeni bölüm" : "New section"} required />
+                      <Button type="submit">+</Button>
+                    </form>
+
+                    <form
+                      className="flex gap-2"
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        const fd = new FormData(e.currentTarget);
+                        void setupMutation(
+                          "subsection",
+                          {
+                            questionnaireSectionId: String(fd.get("section_id") || ""),
+                            name: String(fd.get("subsection_name") || ""),
+                          },
+                          "POST",
+                        );
+                        e.currentTarget.reset();
+                      }}
+                    >
+                      <select name="section_id" className="h-9 rounded-md border border-slate-300 px-2 text-sm" required>
+                        {selectedQuestionnaire.sections.map((section) => (
+                          <option key={section.id} value={section.id}>
+                            {section.name}
+                          </option>
+                        ))}
+                      </select>
+                      <Input name="subsection_name" placeholder={locale === "tr" ? "Yeni alt bölüm" : "New subsection"} required />
+                      <Button type="submit">+</Button>
+                    </form>
+
+                    <form
+                      className="flex flex-col gap-2"
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        const fd = new FormData(e.currentTarget);
+                        void setupMutation(
+                          "question",
+                          {
+                            questionnaireId: selectedQuestionnaire.id,
+                            questionnaireSectionId: String(fd.get("q_section_id") || ""),
+                            questionnaireSubsectionId: String(fd.get("q_subsection_id") || ""),
+                            questionnaireTopicId: String(fd.get("q_topic_id") || "") || null,
+                            section: String(fd.get("q_section_name") || ""),
+                            code: String(fd.get("q_code") || "") || null,
+                            title: String(fd.get("q_title") || ""),
+                            question_text: String(fd.get("q_text") || ""),
+                            unit: String(fd.get("q_unit") || "") || null,
+                            owner_name: String(fd.get("owner_name") || "") || null,
+                            owner_department: String(fd.get("owner_department") || "") || null,
+                            owner_email: String(fd.get("owner_email") || "") || null,
+                            helper: String(fd.get("helper") || "") || null,
+                            example: String(fd.get("example") || "") || null,
+                            reminder: String(fd.get("reminder") || "") || null,
+                            video_link: String(fd.get("video_link") || "") || null,
+                          },
+                          "POST",
+                        );
+                        e.currentTarget.reset();
+                      }}
+                    >
+                      <select name="q_section_id" className="h-9 rounded-md border border-slate-300 px-2 text-sm" required>
+                        {selectedQuestionnaire.sections.map((section) => (
+                          <option key={section.id} value={section.id}>
+                            {section.name}
+                          </option>
+                        ))}
+                      </select>
+                      <select name="q_subsection_id" className="h-9 rounded-md border border-slate-300 px-2 text-sm" required>
+                        {selectedQuestionnaire.sections.flatMap((section) =>
+                          section.subsections.map((subsection) => (
+                            <option key={subsection.id} value={subsection.id}>
+                              {subsection.name}
+                            </option>
+                          )),
+                        )}
+                      </select>
+                      <select name="q_topic_id" className="h-9 rounded-md border border-slate-300 px-2 text-sm">
+                        <option value="">{locale === "tr" ? "Konu seçiniz" : "Select topic"}</option>
+                        {topics.map((topic) => (
+                          <option key={topic.id} value={topic.id}>
+                            {topic.name_tr}
+                          </option>
+                        ))}
+                      </select>
+                      <Input name="q_section_name" placeholder="section" required />
+                      <Input name="q_code" placeholder="code" />
+                      <Input name="q_title" placeholder={locale === "tr" ? "Soru başlığı" : "Question title"} required />
+                      <Textarea name="q_text" placeholder={locale === "tr" ? "Soru metni" : "Question text"} required />
+                      <Input name="q_unit" placeholder="unit" />
+                      <Input name="owner_name" placeholder="owner_name" />
+                      <Input name="owner_department" placeholder="owner_department" />
+                      <Input name="owner_email" type="email" placeholder="owner_email" />
+                      <Textarea name="helper" placeholder="helper" />
+                      <Textarea name="example" placeholder="example" />
+                      <Textarea name="reminder" placeholder="reminder" />
+                      <Input name="video_link" placeholder="video_link" />
+                      <Button type="submit">{locale === "tr" ? "Soru Oluştur" : "Create Question"}</Button>
+                    </form>
+                  </div>
+
+                  <DataTable
+                    data={selectedQuestions}
+                    columns={[
+                      { key: "section", header: "Section", render: (row) => row.section },
+                      { key: "title", header: locale === "tr" ? "Başlık" : "Title", render: (row) => row.title },
+                      {
+                        key: "question",
+                        header: locale === "tr" ? "Soru" : "Question",
+                        render: (row) => <div className="max-w-[450px] whitespace-pre-wrap text-xs">{row.question_text}</div>,
+                      },
+                      { key: "owner", header: "owner_department", render: (row) => row.owner_department || "-" },
+                      {
+                        key: "actions",
+                        header: locale === "tr" ? "İşlem" : "Action",
+                        render: (row) => (
+                          <div className="flex gap-2">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => {
+                                const nextTitle = window.prompt(locale === "tr" ? "Yeni başlık" : "New title", row.title);
+                                if (!nextTitle) return;
+                                void setupMutation(
+                                  "question",
+                                  {
+                                    id: row.id,
+                                    questionnaireId: row.questionnaireId,
+                                    questionnaireSectionId: row.questionnaireSectionId,
+                                    questionnaireSubsectionId: row.questionnaireSubsectionId,
+                                    questionnaireTopicId: null,
+                                    section: row.section,
+                                    title: nextTitle,
+                                    question_text: row.question_text,
+                                    unit: row.unit,
+                                    owner_name: row.owner_name,
+                                    owner_department: row.owner_department,
+                                    owner_email: row.owner_email,
+                                    helper: row.helper,
+                                    example: row.example,
+                                    reminder: row.reminder,
+                                    video_link: row.video_link,
+                                  },
+                                  "PATCH",
+                                );
+                              }}
+                            >
+                              {locale === "tr" ? "Düzenle" : "Edit"}
+                            </Button>
+                            <Button size="sm" variant="destructive" onClick={() => void setupMutation("question", { entityType: "question", id: row.id }, "DELETE")}>
+                              {locale === "tr" ? "Sil" : "Delete"}
+                            </Button>
+                          </div>
+                        ),
+                      },
+                    ]}
+                  />
+                </>
+              ) : (
+                <p className="text-sm text-slate-600">{locale === "tr" ? "Anket bulunamadı." : "No questionnaire found."}</p>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      ) : null}
+
+      {tab === "answers" ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>{t("questionnaireAnswers")}</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <DataTable
+              data={selectedQuestions}
+              columns={[
+                { key: "section", header: "Section", render: (row) => row.section },
+                { key: "title", header: locale === "tr" ? "Başlık" : "Title", render: (row) => row.title },
+                {
+                  key: "answer",
+                  header: locale === "tr" ? "Yanıt" : "Answer",
+                  render: (row) => {
+                    const existing = answerMap.get(row.id);
+                    return (
+                      <div className="flex max-w-[500px] gap-2">
+                        <Input id={`text-${row.id}`} defaultValue={existing?.answer_text || ""} placeholder="Text" />
+                        <Input id={`num-${row.id}`} defaultValue={existing?.answer_number || ""} placeholder="Number" type="number" />
+                      </div>
+                    );
+                  },
+                },
+                {
+                  key: "actions",
+                  header: locale === "tr" ? "İşlem" : "Action",
+                  render: (row) => {
+                    const existing = answerMap.get(row.id);
+                    return (
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          onClick={() => {
+                            const text = (document.getElementById(`text-${row.id}`) as HTMLInputElement | null)?.value || "";
+                            const num = (document.getElementById(`num-${row.id}`) as HTMLInputElement | null)?.value || "";
+                            void saveAnswer(row.id, text, num);
+                          }}
+                        >
+                          {locale === "tr" ? "Kaydet" : "Save"}
+                        </Button>
+                        {existing ? (
+                          <Button size="sm" variant="destructive" onClick={() => void deleteAnswer(existing.id)}>
+                            {locale === "tr" ? "Sil" : "Delete"}
+                          </Button>
+                        ) : null}
+                      </div>
+                    );
+                  },
+                },
+              ]}
+            />
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {tab === "dashboard" ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>{t("questionnaireDashboard")}</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <ProgressBar value={dashboard.progress} label={`${dashboard.progress}%`} />
+            <div className="grid gap-3 md:grid-cols-3">
+              <div className="rounded border border-slate-200 p-3 text-sm">
+                <p className="text-slate-500">{locale === "tr" ? "Toplam Soru" : "Total Questions"}</p>
+                <p className="text-xl font-semibold">{dashboard.totalQuestions}</p>
+              </div>
+              <div className="rounded border border-slate-200 p-3 text-sm">
+                <p className="text-slate-500">{locale === "tr" ? "Yanıtlanan" : "Answered"}</p>
+                <p className="text-xl font-semibold">{dashboard.answered}</p>
+              </div>
+              <div className="rounded border border-slate-200 p-3 text-sm">
+                <p className="text-slate-500">{locale === "tr" ? "Kalan" : "Remaining"}</p>
+                <p className="text-xl font-semibold">{dashboard.remaining}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      ) : null}
+    </div>
+  );
+}
