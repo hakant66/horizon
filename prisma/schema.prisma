@@ -1,0 +1,423 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  ADMIN
+  SUSTAINABILITY_MANAGER
+  DATA_CONTRIBUTOR
+  FINANCE_REVIEWER
+  AUDITOR
+}
+
+enum ReportingPeriodStatus {
+  OPEN
+  LOCKED
+  SUBMITTED
+  CERTIFIED
+}
+
+enum MetricEntryStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  SUBMITTED
+  VALIDATED
+  NEEDS_CORRECTION
+}
+
+enum EvidenceStatus {
+  UPLOADED
+  ACCEPTED
+  REJECTED
+  NEEDS_CLARIFICATION
+}
+
+enum EmissionScope {
+  SCOPE_1
+  SCOPE_2
+}
+
+enum ClimateRiskType {
+  PHYSICAL_ACUTE
+  PHYSICAL_CHRONIC
+  TRANSITION_POLICY_LEGAL
+  TRANSITION_MARKET
+  TRANSITION_TECHNOLOGY
+  TRANSITION_REPUTATION
+}
+
+enum TargetStatus {
+  ON_TRACK
+  AT_RISK
+  OFF_TRACK
+}
+
+enum ReportFramework {
+  IFRS_S1
+  IFRS_S2
+  TSRS_1
+  TSRS_2
+}
+
+enum ReportStatus {
+  DRAFT
+  GENERATED
+  UNDER_REVIEW
+  APPROVED
+  SUBMITTED_FOR_CERTIFICATION
+}
+
+enum CertificationStatus {
+  DRAFT
+  SUBMITTED
+  UNDER_REVIEW
+  CHANGES_REQUESTED
+  RESUBMITTED
+  APPROVED
+  REJECTED
+}
+
+enum LinkedEntityType {
+  METRIC_ENTRY
+  EMISSION_CALCULATION
+  CLIMATE_RISK
+  REPORT
+  CERTIFICATION_SUBMISSION
+}
+
+model Organization {
+  id                 String            @id @default(cuid())
+  name               String
+  taxId              String?
+  sector             String
+  headquartersCountry String
+  reportingCurrency  String
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+
+  users              User[]
+  facilities         Facility[]
+  reportingPeriods   ReportingPeriod[]
+  metricEntries      MetricEntry[]
+  evidence           Evidence[]
+  emissionCalculations EmissionCalculation[]
+  materialityTopics  MaterialityTopic[]
+  climateRisks       ClimateRisk[]
+  targets            Target[]
+  reports            Report[]
+  certifications     CertificationSubmission[]
+  auditLogs          AuditLog[]
+}
+
+model User {
+  id             String      @id @default(cuid())
+  name           String
+  email          String      @unique
+  password       String
+  role           UserRole
+  organizationId String
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  ownedMetricEntries MetricEntry[] @relation("MetricEntryOwner")
+  uploadedEvidence Evidence[] @relation("EvidenceUploader")
+  ownedRisks      ClimateRisk[] @relation("RiskOwner")
+  submittedCertifications CertificationSubmission[] @relation("CertificationSubmitter")
+  reviewedCertifications CertificationSubmission[] @relation("CertificationReviewer")
+  certificationComments CertificationComment[]
+  auditLogs      AuditLog[]
+}
+
+model Facility {
+  id             String      @id @default(cuid())
+  organizationId String
+  name           String
+  country        String
+  city           String?
+  facilityType   String
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  metricEntries  MetricEntry[]
+  emissionCalculations EmissionCalculation[]
+  climateRisks   ClimateRisk[]
+}
+
+model ReportingPeriod {
+  id             String               @id @default(cuid())
+  organizationId String
+  name           String
+  startDate      DateTime
+  endDate        DateTime
+  status         ReportingPeriodStatus
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
+
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  metricEntries  MetricEntry[]
+  emissionCalculations EmissionCalculation[]
+  materialityTopics MaterialityTopic[]
+  climateRisks   ClimateRisk[]
+  targets        Target[]
+  reports        Report[]
+  certifications CertificationSubmission[]
+
+  @@unique([organizationId, name])
+}
+
+model MetricDefinition {
+  id             String      @id @default(cuid())
+  code           String      @unique
+  name           String
+  category       String
+  unit           String
+  description    String?
+  isRequired     Boolean     @default(true)
+  sector         String?
+
+  metricEntries  MetricEntry[]
+  targets        Target[]
+}
+
+model MetricEntry {
+  id                 String           @id @default(cuid())
+  organizationId     String
+  facilityId         String
+  reportingPeriodId  String
+  metricDefinitionId String
+  value              Decimal?         @db.Decimal(14, 4)
+  unit               String
+  status             MetricEntryStatus @default(NOT_STARTED)
+  ownerUserId        String?
+  notes              String?
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+
+  organization       Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  facility           Facility     @relation(fields: [facilityId], references: [id], onDelete: Cascade)
+  reportingPeriod    ReportingPeriod @relation(fields: [reportingPeriodId], references: [id], onDelete: Cascade)
+  metricDefinition   MetricDefinition @relation(fields: [metricDefinitionId], references: [id], onDelete: Restrict)
+  ownerUser          User? @relation("MetricEntryOwner", fields: [ownerUserId], references: [id])
+  emissions          EmissionCalculation[]
+
+  @@index([organizationId, reportingPeriodId])
+  @@unique([facilityId, reportingPeriodId, metricDefinitionId])
+}
+
+model Evidence {
+  id             String          @id @default(cuid())
+  organizationId String
+  linkedEntityType LinkedEntityType
+  linkedEntityId String
+  fileName       String
+  fileUrl        String
+  fileType       String
+  fileSize       Int
+  uploadedById   String
+  status         EvidenceStatus  @default(UPLOADED)
+  reviewerComment String?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  uploadedBy     User @relation("EvidenceUploader", fields: [uploadedById], references: [id], onDelete: Restrict)
+}
+
+model EmissionFactor {
+  id             String      @id @default(cuid())
+  name           String
+  country        String
+  activityUnit   String
+  factorValue    Decimal     @db.Decimal(12, 6)
+  factorUnit     String
+  source         String
+  versionYear    Int
+  scope          EmissionScope
+  category       String
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  calculations   EmissionCalculation[]
+}
+
+model EmissionCalculation {
+  id               String      @id @default(cuid())
+  organizationId   String
+  facilityId       String
+  reportingPeriodId String
+  metricEntryId    String
+  emissionFactorId String
+  scope            EmissionScope
+  activityValue    Decimal     @db.Decimal(14, 4)
+  activityUnit     String
+  factorValue      Decimal     @db.Decimal(12, 6)
+  resultTCO2e      Decimal     @db.Decimal(14, 6)
+  calculationFormula String
+  overrideReason   String?
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+
+  organization     Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  facility         Facility @relation(fields: [facilityId], references: [id], onDelete: Cascade)
+  reportingPeriod  ReportingPeriod @relation(fields: [reportingPeriodId], references: [id], onDelete: Cascade)
+  metricEntry      MetricEntry @relation(fields: [metricEntryId], references: [id], onDelete: Cascade)
+  emissionFactor   EmissionFactor @relation(fields: [emissionFactorId], references: [id], onDelete: Restrict)
+}
+
+model MaterialityTopic {
+  id                       String    @id @default(cuid())
+  organizationId           String
+  reportingPeriodId        String
+  name                     String
+  category                 String
+  financialImpactScore     Int
+  impactSeverityScore      Int
+  likelihoodScore          Int
+  stakeholderConcernScore  Int
+  isMaterial               Boolean   @default(false)
+  notes                    String?
+  createdAt                DateTime  @default(now())
+  updatedAt                DateTime  @updatedAt
+
+  organization             Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  reportingPeriod          ReportingPeriod @relation(fields: [reportingPeriodId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, reportingPeriodId, name])
+}
+
+model ClimateRisk {
+  id                      String        @id @default(cuid())
+  organizationId          String
+  reportingPeriodId       String
+  facilityId              String?
+  name                    String
+  type                    ClimateRiskType
+  probability             String
+  impact                  String
+  financialImpactEstimate Decimal?      @db.Decimal(14, 2)
+  ownerUserId             String?
+  mitigationPlan          String?
+  notes                   String?
+  createdAt               DateTime      @default(now())
+  updatedAt               DateTime      @updatedAt
+
+  organization            Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  reportingPeriod         ReportingPeriod @relation(fields: [reportingPeriodId], references: [id], onDelete: Cascade)
+  facility                Facility? @relation(fields: [facilityId], references: [id], onDelete: SetNull)
+  ownerUser               User? @relation("RiskOwner", fields: [ownerUserId], references: [id], onDelete: SetNull)
+  scenarios               ScenarioAnalysis[]
+}
+
+model ScenarioAnalysis {
+  id                            String   @id @default(cuid())
+  climateRiskId                 String
+  scenarioName                  String
+  temperaturePathway            String
+  qualitativeImpact             String?
+  estimatedRevenueImpactPercent Decimal? @db.Decimal(8, 2)
+  estimatedCostImpact           Decimal? @db.Decimal(14, 2)
+  assumptions                   String?
+  createdAt                     DateTime @default(now())
+  updatedAt                     DateTime @updatedAt
+
+  climateRisk                   ClimateRisk @relation(fields: [climateRiskId], references: [id], onDelete: Cascade)
+}
+
+model Target {
+  id                 String       @id @default(cuid())
+  organizationId     String
+  reportingPeriodId  String
+  name               String
+  metricDefinitionId String
+  baselineYear       Int
+  baselineValue      Decimal      @db.Decimal(14, 4)
+  targetYear         Int
+  targetValue        Decimal      @db.Decimal(14, 4)
+  currentValue       Decimal      @db.Decimal(14, 4)
+  status             TargetStatus
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
+
+  organization       Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  reportingPeriod    ReportingPeriod @relation(fields: [reportingPeriodId], references: [id], onDelete: Cascade)
+  metricDefinition   MetricDefinition @relation(fields: [metricDefinitionId], references: [id], onDelete: Restrict)
+}
+
+model Report {
+  id                 String        @id @default(cuid())
+  organizationId     String
+  reportingPeriodId  String
+  framework          ReportFramework
+  status             ReportStatus  @default(DRAFT)
+  governanceText     String?
+  strategyText       String?
+  riskManagementText String?
+  metricsTargetsText String?
+  generatedAt        DateTime?
+  submittedAt        DateTime?
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+
+  organization       Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  reportingPeriod    ReportingPeriod @relation(fields: [reportingPeriodId], references: [id], onDelete: Cascade)
+  certifications     CertificationSubmission[]
+}
+
+model CertificationSubmission {
+  id                String              @id @default(cuid())
+  organizationId    String
+  reportingPeriodId String
+  reportId          String
+  status            CertificationStatus @default(DRAFT)
+  submittedById     String?
+  reviewedById      String?
+  submittedAt       DateTime?
+  reviewedAt        DateTime?
+  decisionNotes     String?
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+
+  organization      Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  reportingPeriod   ReportingPeriod @relation(fields: [reportingPeriodId], references: [id], onDelete: Cascade)
+  report            Report @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  submittedBy       User? @relation("CertificationSubmitter", fields: [submittedById], references: [id], onDelete: SetNull)
+  reviewedBy        User? @relation("CertificationReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+  comments          CertificationComment[]
+}
+
+model CertificationComment {
+  id                         String   @id @default(cuid())
+  certificationSubmissionId  String
+  authorUserId               String
+  comment                    String
+  linkedEntityType           LinkedEntityType?
+  linkedEntityId             String?
+  createdAt                  DateTime @default(now())
+
+  certificationSubmission    CertificationSubmission @relation(fields: [certificationSubmissionId], references: [id], onDelete: Cascade)
+  authorUser                 User @relation(fields: [authorUserId], references: [id], onDelete: Restrict)
+}
+
+model AuditLog {
+  id              String   @id @default(cuid())
+  organizationId  String
+  userId          String?
+  action          String
+  entityType      String
+  entityId        String
+  beforeValueJson Json?
+  afterValueJson  Json?
+  createdAt       DateTime @default(now())
+
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user            User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, createdAt])
+}

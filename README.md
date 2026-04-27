@@ -1,36 +1,157 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Horizon Sustainability Platform (MVP)
 
-## Getting Started
+Workflow-first sustainability reporting and certification platform for companies in Turkey, aligned to IFRS S1/S2 and TSRS 1/2.
 
-First, run the development server:
+## What Is Included
+
+- Multi-tenant data model with organization-level isolation
+- Role-based auth (Admin, Sustainability Manager, Data Contributor, Finance Reviewer, Auditor)
+- Setup wizard (organization, facilities, users, reporting period)
+- Materiality scoring + matrix
+- Data collection table + evidence upload
+- Scope 1/2 emissions calculation and transparent formula detail
+- Climate risk register + scenario analysis
+- Targets and progress tracking
+- Report generation/editing/export (HTML)
+- Certification workflow (submit, comments, request changes, approve/reject)
+- Audit trail for key mutations
+- Unit, component, and basic E2E test coverage
+
+## Tech Stack
+
+- Next.js App Router + TypeScript + Tailwind
+- Prisma ORM + PostgreSQL
+- NextAuth (credentials)
+- React Hook Form + Zod
+- Recharts + Lucide
+- Vitest + React Testing Library + Playwright
+
+## Disclaimer
+
+This platform provides structured sustainability reporting support. Final regulatory compliance and certification decisions require review by qualified professionals.
+
+Seeded emission factors are placeholder/demo values and must be verified before production use.
+
+## Quick Start (Docker)
+
+### 1. Build and run
+
+```bash
+docker compose up --build -d
+```
+
+### 2. Open app
+
+- App: http://localhost:3000
+- Postgres: localhost:5432
+
+### 3. Demo login
+
+- Email: `admin@demo.com`
+- Password: `Demo1234!`
+
+Other seeded users:
+
+- `sustainability@demo.com`
+- `contributor@demo.com`
+- `cfo@demo.com`
+- `auditor@demo.com`
+
+All use password: `Demo1234!`
+
+### 4. Stop containers
+
+```bash
+docker compose down
+```
+
+## Local Non-Docker Setup
+
+### Prerequisites
+
+- Node.js 20+
+- PostgreSQL
+
+### Configure env
+
+```bash
+cp .env.example .env
+```
+
+### Install + DB + seed
+
+```bash
+npm ci
+npm run prisma:generate
+npm run db:push
+npm run prisma:seed
+```
+
+### Run dev server
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Commands
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+npm run lint
+npm run test
+npm run test:e2e
+npm run build
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Docker Notes
 
-## Learn More
+- `docker/entrypoint.sh` applies schema and seeds demo data on container start.
+- Evidence files are saved under `/app/uploads` and persisted via Docker volume.
 
-To learn more about Next.js, take a look at the following resources:
+## Main Routes
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+- `/dashboard`
+- `/setup`
+- `/materiality`
+- `/data-collection`
+- `/emissions`
+- `/risks`
+- `/targets`
+- `/reports`
+- `/reports/[id]`
+- `/certification`
+- `/certification/[id]`
+- `/audit-trail`
+- `/settings`
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## API Modules
 
-## Deploy on Vercel
+- Organization, facilities, users, reporting periods
+- Materiality, metrics, evidence
+- Emissions + recalculation
+- Risks + scenarios
+- Targets
+- Reports + generation
+- Certification + comments + decisions
+- Audit logs
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Seed Data
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Includes one demo organization:
+
+- `Demo Manufacturing A.Ş.`
+- Sector: Manufacturing
+- Country: Turkey
+- Reporting period: 2025
+- Facilities: Istanbul Plant, Ankara Office
+
+Also seeds:
+
+- Required metric definitions
+- Demo metric entries
+- Placeholder emission factors
+- Materiality topics
+- Climate risk + scenario
+- Target
+- Report + certification sample + comments
+- Audit logs
+
