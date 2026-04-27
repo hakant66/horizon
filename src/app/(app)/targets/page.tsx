@@ -8,7 +8,16 @@ import { calculateTargetProgress } from "@/lib/calculations";
 export default async function TargetsPage() {
   const { organization, reportingPeriod } = await getWorkspaceContext();
   if (!reportingPeriod) {
-    return <EmptyState title="No reporting period" description="Create one in Setup to define targets." />;
+    return (
+      <EmptyState
+        title="No reporting period"
+        titleTr="Raporlama dönemi yok"
+        titleEn="No reporting period"
+        description="Create one in Setup to define targets."
+        descriptionTr="Hedefleri tanımlamak için Kurulum bölümünde bir dönem oluşturun."
+        descriptionEn="Create one in Setup to define targets."
+      />
+    );
   }
 
   const [metricDefinitions, targets] = await Promise.all([
@@ -22,7 +31,14 @@ export default async function TargetsPage() {
 
   return (
     <div className="space-y-4">
-      <PageHeader title="Targets" description="Track target progress and KPI status across reporting periods." />
+      <PageHeader
+        title="Targets"
+        titleTr="Hedefler"
+        titleEn="Targets"
+        description="Track target progress and KPI status across reporting periods."
+        descriptionTr="Raporlama dönemleri boyunca hedef ilerlemesini ve KPI durumunu takip edin."
+        descriptionEn="Track target progress and KPI status across reporting periods."
+      />
       <TargetsClient
         reportingPeriodId={reportingPeriod.id}
         metricDefinitions={metricDefinitions}

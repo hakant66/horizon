@@ -7,7 +7,16 @@ import { prisma } from "@/lib/prisma";
 export default async function CertificationPage() {
   const { organization, reportingPeriod } = await getWorkspaceContext();
   if (!reportingPeriod) {
-    return <EmptyState title="No reporting period" description="Create one in Setup to run certification workflow." />;
+    return (
+      <EmptyState
+        title="No reporting period"
+        titleTr="Raporlama dönemi yok"
+        titleEn="No reporting period"
+        description="Create one in Setup to run certification workflow."
+        descriptionTr="Belgelendirme iş akışını yürütmek için Kurulum bölümünde bir dönem oluşturun."
+        descriptionEn="Create one in Setup to run certification workflow."
+      />
+    );
   }
 
   const [reports, submissions] = await Promise.all([
@@ -24,7 +33,14 @@ export default async function CertificationPage() {
 
   return (
     <div className="space-y-4">
-      <PageHeader title="Certification" description="Manage submissions, auditor review, and certification decisions." />
+      <PageHeader
+        title="Certification"
+        titleTr="Belgelendirme"
+        titleEn="Certification"
+        description="Manage submissions, auditor review, and certification decisions."
+        descriptionTr="Başvuruları, denetçi incelemesini ve belgelendirme kararlarını yönetin."
+        descriptionEn="Manage submissions, auditor review, and certification decisions."
+      />
       <CertificationClient reportingPeriodId={reportingPeriod.id} reports={reports} submissions={submissions} />
     </div>
   );

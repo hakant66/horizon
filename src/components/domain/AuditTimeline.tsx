@@ -1,14 +1,19 @@
+"use client";
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useI18n } from "@/components/providers/LanguageProvider";
 
 export function AuditTimeline({
   items,
 }: {
   items: { id: string; timestamp: string; text: string }[];
 }) {
+  const { locale } = useI18n();
+
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Activity Log</CardTitle>
+        <CardTitle>{locale === "tr" ? "Aktivite Kaydı" : "Activity Log"}</CardTitle>
       </CardHeader>
       <CardContent>
         <div className="space-y-2">

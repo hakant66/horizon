@@ -16,7 +16,14 @@ export default async function ReportDetailPage({ params }: { params: Promise<{ i
 
   return (
     <div className="space-y-4">
-      <PageHeader title={`Report ${report.framework}`} description={`Status: ${report.status}`} />
+      <PageHeader
+        title={`Report ${report.framework}`}
+        titleTr={`Rapor ${report.framework}`}
+        titleEn={`Report ${report.framework}`}
+        description={`Status: ${report.status}`}
+        descriptionTr={`Durum: ${report.status}`}
+        descriptionEn={`Status: ${report.status}`}
+      />
       <ReportDetailClient report={report} reportingPeriodId={report.reportingPeriodId} />
     </div>
   );

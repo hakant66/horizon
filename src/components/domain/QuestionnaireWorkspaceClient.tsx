@@ -15,6 +15,8 @@ type Topic = { id: string; name_tr: string; name_en: string | null };
 type Question = {
   id: string;
   questionnaireId: string;
+  questionnaireTopicId: string | null;
+  code: string | null;
   title: string;
   question_text: string;
   section: string;
@@ -68,6 +70,7 @@ export function QuestionnaireWorkspaceClient({
   const [answers, setAnswers] = useState(initialAnswers);
   const [dashboard, setDashboard] = useState(initialDashboard);
   const [message, setMessage] = useState("");
+  const [editingQuestion, setEditingQuestion] = useState<Question | null>(null);
 
   const [selectedQuestionnaireId, setSelectedQuestionnaireId] = useState(initialQuestionnaires[0]?.id || "");
 
@@ -90,12 +93,13 @@ export function QuestionnaireWorkspaceClient({
     return map;
   }, [answers]);
 
-  async function refreshAll() {
-    if (!selectedQuestionnaireId) return;
+  async function refreshAll(questionnaireId?: string) {
+    const activeQuestionnaireId = questionnaireId || selectedQuestionnaireId;
+    if (!activeQuestionnaireId) return;
     const [setupRes, answersRes, dashboardRes] = await Promise.all([
-      fetch(`/api/questionnaire/setup?questionnaireId=${selectedQuestionnaireId}`),
-      fetch(`/api/questionnaire/answers?questionnaireId=${selectedQuestionnaireId}&reportingPeriodId=${reportingPeriodId}`),
-      fetch(`/api/questionnaire/dashboard?questionnaireId=${selectedQuestionnaireId}&reportingPeriodId=${reportingPeriodId}`),
+      fetch("/api/questionnaire/setup"),
+      fetch(`/api/questionnaire/answers?questionnaireId=${activeQuestionnaireId}&reportingPeriodId=${reportingPeriodId}`),
+      fetch(`/api/questionnaire/dashboard?questionnaireId=${activeQuestionnaireId}&reportingPeriodId=${reportingPeriodId}`),
     ]);
 
     if (setupRes.ok) {
@@ -188,8 +192,9 @@ export function QuestionnaireWorkspaceClient({
           className="h-9 rounded-md border border-slate-300 px-3 text-sm"
           value={selectedQuestionnaireId}
           onChange={(e) => {
-            setSelectedQuestionnaireId(e.target.value);
-            void setTimeout(refreshAll, 0);
+            const nextId = e.target.value;
+            setSelectedQuestionnaireId(nextId);
+            void refreshAll(nextId);
           }}
         >
           {questionnaires.map((q) => (
@@ -418,18 +423,18 @@ export function QuestionnaireWorkspaceClient({
                           </option>
                         ))}
                       </select>
-                      <Input name="q_section_name" placeholder="section" required />
-                      <Input name="q_code" placeholder="code" />
+                      <Input name="q_section_name" placeholder={locale === "tr" ? "Bölüm adı" : "Section name"} required />
+                      <Input name="q_code" placeholder={locale === "tr" ? "Kod" : "Code"} />
                       <Input name="q_title" placeholder={locale === "tr" ? "Soru başlığı" : "Question title"} required />
                       <Textarea name="q_text" placeholder={locale === "tr" ? "Soru metni" : "Question text"} required />
-                      <Input name="q_unit" placeholder="unit" />
-                      <Input name="owner_name" placeholder="owner_name" />
-                      <Input name="owner_department" placeholder="owner_department" />
-                      <Input name="owner_email" type="email" placeholder="owner_email" />
-                      <Textarea name="helper" placeholder="helper" />
-                      <Textarea name="example" placeholder="example" />
-                      <Textarea name="reminder" placeholder="reminder" />
-                      <Input name="video_link" placeholder="video_link" />
+                      <Input name="q_unit" placeholder={locale === "tr" ? "Birim" : "Unit"} />
+                      <Input name="owner_name" placeholder={locale === "tr" ? "Sorumlu adı" : "Owner name"} />
+                      <Input name="owner_department" placeholder={locale === "tr" ? "Sorumlu departman" : "Owner department"} />
+                      <Input name="owner_email" type="email" placeholder={locale === "tr" ? "Sorumlu e-posta" : "Owner email"} />
+                      <Textarea name="helper" placeholder={locale === "tr" ? "Yardımcı not" : "Helper"} />
+                      <Textarea name="example" placeholder={locale === "tr" ? "Örnek" : "Example"} />
+                      <Textarea name="reminder" placeholder={locale === "tr" ? "Hatırlatma" : "Reminder"} />
+                      <Input name="video_link" placeholder={locale === "tr" ? "Video linki" : "Video link"} />
                       <Button type="submit">{locale === "tr" ? "Soru Oluştur" : "Create Question"}</Button>
                     </form>
                   </div>
@@ -437,14 +442,14 @@ export function QuestionnaireWorkspaceClient({
                   <DataTable
                     data={selectedQuestions}
                     columns={[
-                      { key: "section", header: "Section", render: (row) => row.section },
+                      { key: "section", header: locale === "tr" ? "Bölüm" : "Section", render: (row) => row.section },
                       { key: "title", header: locale === "tr" ? "Başlık" : "Title", render: (row) => row.title },
                       {
                         key: "question",
                         header: locale === "tr" ? "Soru" : "Question",
                         render: (row) => <div className="max-w-[450px] whitespace-pre-wrap text-xs">{row.question_text}</div>,
                       },
-                      { key: "owner", header: "owner_department", render: (row) => row.owner_department || "-" },
+                      { key: "owner", header: locale === "tr" ? "Sorumlu Departman" : "Owner Department", render: (row) => row.owner_department || "-" },
                       {
                         key: "actions",
                         header: locale === "tr" ? "İşlem" : "Action",
@@ -453,32 +458,7 @@ export function QuestionnaireWorkspaceClient({
                             <Button
                               size="sm"
                               variant="outline"
-                              onClick={() => {
-                                const nextTitle = window.prompt(locale === "tr" ? "Yeni başlık" : "New title", row.title);
-                                if (!nextTitle) return;
-                                void setupMutation(
-                                  "question",
-                                  {
-                                    id: row.id,
-                                    questionnaireId: row.questionnaireId,
-                                    questionnaireSectionId: row.questionnaireSectionId,
-                                    questionnaireSubsectionId: row.questionnaireSubsectionId,
-                                    questionnaireTopicId: null,
-                                    section: row.section,
-                                    title: nextTitle,
-                                    question_text: row.question_text,
-                                    unit: row.unit,
-                                    owner_name: row.owner_name,
-                                    owner_department: row.owner_department,
-                                    owner_email: row.owner_email,
-                                    helper: row.helper,
-                                    example: row.example,
-                                    reminder: row.reminder,
-                                    video_link: row.video_link,
-                                  },
-                                  "PATCH",
-                                );
-                              }}
+                              onClick={() => setEditingQuestion(row)}
                             >
                               {locale === "tr" ? "Düzenle" : "Edit"}
                             </Button>
@@ -490,6 +470,88 @@ export function QuestionnaireWorkspaceClient({
                       },
                     ]}
                   />
+
+                  {editingQuestion ? (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setEditingQuestion(null)}>
+                      <form
+                        className="grid max-h-[90vh] w-full max-w-4xl gap-2 overflow-y-auto rounded-md border border-slate-200 bg-white p-4 md:grid-cols-2"
+                        onClick={(e) => e.stopPropagation()}
+                        onSubmit={(e) => {
+                          e.preventDefault();
+                          if (!selectedQuestionnaire) return;
+                          const fd = new FormData(e.currentTarget);
+                          void setupMutation(
+                            "question",
+                            {
+                              id: editingQuestion.id,
+                              questionnaireId: selectedQuestionnaire.id,
+                              questionnaireSectionId: String(fd.get("q_section_id") || ""),
+                              questionnaireSubsectionId: String(fd.get("q_subsection_id") || ""),
+                              questionnaireTopicId: String(fd.get("q_topic_id") || "") || null,
+                              section: String(fd.get("q_section_name") || ""),
+                              code: String(fd.get("q_code") || "") || null,
+                              title: String(fd.get("q_title") || ""),
+                              question_text: String(fd.get("q_text") || ""),
+                              unit: String(fd.get("q_unit") || "") || null,
+                              owner_name: String(fd.get("owner_name") || "") || null,
+                              owner_department: String(fd.get("owner_department") || "") || null,
+                              owner_email: String(fd.get("owner_email") || "") || null,
+                              helper: String(fd.get("helper") || "") || null,
+                              example: String(fd.get("example") || "") || null,
+                              reminder: String(fd.get("reminder") || "") || null,
+                              video_link: String(fd.get("video_link") || "") || null,
+                            },
+                            "PATCH",
+                          );
+                          setEditingQuestion(null);
+                        }}
+                      >
+                        <p className="col-span-full text-sm font-semibold">{locale === "tr" ? "Soruyu Düzenle" : "Edit Question"}</p>
+                        <select name="q_section_id" defaultValue={editingQuestion.questionnaireSectionId || ""} className="h-9 rounded-md border border-slate-300 px-2 text-sm" required>
+                          {selectedQuestionnaire.sections.map((section) => (
+                            <option key={section.id} value={section.id}>
+                              {section.name}
+                            </option>
+                          ))}
+                        </select>
+                        <select name="q_subsection_id" defaultValue={editingQuestion.questionnaireSubsectionId || ""} className="h-9 rounded-md border border-slate-300 px-2 text-sm" required>
+                          {selectedQuestionnaire.sections.flatMap((section) =>
+                            section.subsections.map((subsection) => (
+                              <option key={subsection.id} value={subsection.id}>
+                                {subsection.name}
+                              </option>
+                            )),
+                          )}
+                        </select>
+                        <select name="q_topic_id" defaultValue={editingQuestion.questionnaireTopicId || ""} className="h-9 rounded-md border border-slate-300 px-2 text-sm">
+                          <option value="">{locale === "tr" ? "Konu seçiniz" : "Select topic"}</option>
+                          {topics.map((topic) => (
+                            <option key={topic.id} value={topic.id}>
+                              {topic.name_tr}
+                            </option>
+                          ))}
+                        </select>
+                        <Input name="q_section_name" defaultValue={editingQuestion.section} placeholder={locale === "tr" ? "Bölüm adı" : "Section name"} required />
+                        <Input name="q_code" defaultValue={editingQuestion.code || ""} placeholder={locale === "tr" ? "Kod" : "Code"} />
+                        <Input name="q_title" defaultValue={editingQuestion.title} placeholder={locale === "tr" ? "Soru başlığı" : "Question title"} required />
+                        <Textarea name="q_text" defaultValue={editingQuestion.question_text} placeholder={locale === "tr" ? "Soru metni" : "Question text"} required />
+                        <Input name="q_unit" defaultValue={editingQuestion.unit || ""} placeholder={locale === "tr" ? "Birim" : "Unit"} />
+                        <Input name="owner_name" defaultValue={editingQuestion.owner_name || ""} placeholder={locale === "tr" ? "Sorumlu adı" : "Owner name"} />
+                        <Input name="owner_department" defaultValue={editingQuestion.owner_department || ""} placeholder={locale === "tr" ? "Sorumlu departman" : "Owner department"} />
+                        <Input name="owner_email" type="email" defaultValue={editingQuestion.owner_email || ""} placeholder={locale === "tr" ? "Sorumlu e-posta" : "Owner email"} />
+                        <Textarea name="helper" defaultValue={editingQuestion.helper || ""} placeholder={locale === "tr" ? "Yardımcı not" : "Helper"} />
+                        <Textarea name="example" defaultValue={editingQuestion.example || ""} placeholder={locale === "tr" ? "Örnek" : "Example"} />
+                        <Textarea name="reminder" defaultValue={editingQuestion.reminder || ""} placeholder={locale === "tr" ? "Hatırlatma" : "Reminder"} />
+                        <Input name="video_link" defaultValue={editingQuestion.video_link || ""} placeholder={locale === "tr" ? "Video linki" : "Video link"} />
+                        <div className="col-span-full flex gap-2">
+                          <Button type="submit">{locale === "tr" ? "Güncelle" : "Update"}</Button>
+                          <Button type="button" variant="outline" onClick={() => setEditingQuestion(null)}>
+                            {locale === "tr" ? "Vazgeç" : "Cancel"}
+                          </Button>
+                        </div>
+                      </form>
+                    </div>
+                  ) : null}
                 </>
               ) : (
                 <p className="text-sm text-slate-600">{locale === "tr" ? "Anket bulunamadı." : "No questionnaire found."}</p>
@@ -504,53 +566,114 @@ export function QuestionnaireWorkspaceClient({
           <CardHeader>
             <CardTitle>{t("questionnaireAnswers")}</CardTitle>
           </CardHeader>
-          <CardContent>
-            <DataTable
-              data={selectedQuestions}
-              columns={[
-                { key: "section", header: "Section", render: (row) => row.section },
-                { key: "title", header: locale === "tr" ? "Başlık" : "Title", render: (row) => row.title },
-                {
-                  key: "answer",
-                  header: locale === "tr" ? "Yanıt" : "Answer",
-                  render: (row) => {
+          <CardContent className="space-y-4">
+            <div className="grid gap-2 lg:grid-cols-3">
+              <div className="overflow-hidden rounded-sm border border-black bg-[#e6e6e6] lg:col-span-2">
+                <div className="grid grid-cols-12 border-b border-black">
+                  <div className="col-span-3 border-r border-black px-3 py-2 text-sm font-bold uppercase tracking-wide">
+                    {locale === "tr" ? "VERİ GİRİŞİ" : "DATA ENTRY"}
+                  </div>
+                  <div className="col-span-9 px-3 py-2 text-sm font-bold uppercase tracking-wide">
+                    {locale === "tr" ? "AŞAĞIDAKİ ADIMLARI UYGULAYINIZ" : "FOLLOW THE STEPS BELOW"}
+                  </div>
+                </div>
+                <div className="grid grid-cols-12 border-b border-black">
+                  <div className="col-span-3 border-r border-black px-3 py-1 text-base font-bold">{dashboard.progress}%</div>
+                  <div className="col-span-9 px-3 py-1 text-sm font-semibold">
+                    {locale === "tr" ? "YALNIZCA YANIT SÜTUNUNU DOLDURUNUZ" : "ONLY FILL IN THE ANSWER COLUMN"}
+                  </div>
+                </div>
+                <div className="grid grid-cols-12 border-b border-black">
+                  <div className="col-span-3 border-r border-black px-3 py-1 text-sm">&nbsp;</div>
+                  <div className="col-span-9 px-3 py-1 text-sm font-semibold">
+                    {locale === "tr"
+                      ? "ÖNCE SAĞDA YER ALAN DEPARTMAN BUTONUNDAN DEPARTMANINIZI SEÇEBİLİRSİNİZ"
+                      : "YOU CAN FIRST SELECT YOUR DEPARTMENT USING THE DEPARTMENT BUTTON"}
+                  </div>
+                </div>
+                <div className="grid grid-cols-12">
+                  <div className="col-span-3 border-r border-black px-3 py-1 text-sm">&nbsp;</div>
+                  <div className="col-span-9 px-3 py-1 text-sm font-semibold">
+                    {locale === "tr"
+                      ? "GRI 3-3 SORULARININ YANITLANMASI STANDARDA GÖRE ZORUNLUDUR"
+                      : "ANSWERING GRI 3-3 QUESTIONS IS REQUIRED BY THE STANDARD"}
+                  </div>
+                </div>
+              </div>
+              <div className="rounded-sm border border-[#2e7d32] bg-[#edf7ed] px-3 py-2 text-xs text-[#1b5e20]">
+                {locale === "tr"
+                  ? "Bu panel, Excel’deki bilgilendirme alanını temsil eder. Soru yanıtlamadan önce adımları takip ediniz."
+                  : "This panel mirrors the informational area from the Excel sheet. Follow steps before answering."}
+              </div>
+            </div>
+
+            <div className="overflow-x-auto rounded-sm border border-black bg-white">
+              <table className="w-full min-w-[1400px] border-collapse text-[12px]">
+                <thead>
+                  <tr className="bg-[#0070c0] text-white">
+                    <th className="border border-black px-2 py-2 text-left font-bold uppercase">KONU</th>
+                    <th className="border border-black px-2 py-2 text-left font-bold uppercase">KOD</th>
+                    <th className="border border-black px-2 py-2 text-left font-bold uppercase">SORU BAŞLIĞI</th>
+                    <th className="border border-black px-2 py-2 text-left font-bold uppercase">SORU</th>
+                    <th className="border border-black px-2 py-2 text-left font-bold uppercase">
+                      {locale === "tr" ? "LÜTFEN BURAYA YANIT GİRİNİZ" : "ENTER ANSWER HERE"}
+                    </th>
+                    <th className="border border-black px-2 py-2 text-left font-bold uppercase">İLGİLİ BİRİM</th>
+                    <th className="border border-black px-2 py-2 text-left font-bold uppercase">VERİ DOĞRULUĞU</th>
+                    <th className="border border-black px-2 py-2 text-left font-bold uppercase">AÇIKLAMA</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {selectedQuestions.map((row, index) => {
                     const existing = answerMap.get(row.id);
                     return (
-                      <div className="flex max-w-[500px] gap-2">
-                        <Input id={`text-${row.id}`} defaultValue={existing?.answer_text || ""} placeholder="Text" />
-                        <Input id={`num-${row.id}`} defaultValue={existing?.answer_number || ""} placeholder="Number" type="number" />
-                      </div>
+                      <tr key={row.id} className={index % 2 === 0 ? "bg-white" : "bg-[#f7fbff]"}>
+                        <td className="border border-black px-2 py-2 align-top font-medium">{row.section}</td>
+                        <td className="border border-black px-2 py-2 align-top">{row.code || "-"}</td>
+                        <td className="border border-black px-2 py-2 align-top font-semibold">{row.title}</td>
+                        <td className="border border-black px-2 py-2 align-top">
+                          <div className="max-w-[420px] whitespace-pre-wrap">{row.question_text}</div>
+                        </td>
+                        <td className="border border-black px-2 py-2 align-top">
+                          <div className="flex min-w-[280px] flex-col gap-2">
+                            <div className="flex gap-2">
+                              <Input id={`text-${row.id}`} defaultValue={existing?.answer_text || ""} placeholder={locale === "tr" ? "Yanıt" : "Answer"} />
+                              {selectedQuestionnaire?.type === "NUMERIC" ? (
+                                <Input id={`num-${row.id}`} defaultValue={existing?.answer_number || ""} placeholder="0" type="number" />
+                              ) : null}
+                            </div>
+                            <div className="flex gap-2">
+                              <Button
+                                size="sm"
+                                onClick={() => {
+                                  const text = (document.getElementById(`text-${row.id}`) as HTMLInputElement | null)?.value || "";
+                                  const num = (document.getElementById(`num-${row.id}`) as HTMLInputElement | null)?.value || "";
+                                  void saveAnswer(row.id, text, num);
+                                }}
+                              >
+                                {locale === "tr" ? "Kaydet" : "Save"}
+                              </Button>
+                              {existing ? (
+                                <Button size="sm" variant="destructive" onClick={() => void deleteAnswer(existing.id)}>
+                                  {locale === "tr" ? "Sil" : "Delete"}
+                                </Button>
+                              ) : null}
+                            </div>
+                          </div>
+                        </td>
+                        <td className="border border-black px-2 py-2 align-top">{row.owner_department || "-"}</td>
+                        <td className="border border-black px-2 py-2 align-top">
+                          {existing ? (locale === "tr" ? "Tamamlandı" : "Completed") : locale === "tr" ? "Bekliyor" : "Pending"}
+                        </td>
+                        <td className="border border-black px-2 py-2 align-top text-slate-700">
+                          <div className="max-w-[360px] whitespace-pre-wrap">{row.helper || "-"}</div>
+                        </td>
+                      </tr>
                     );
-                  },
-                },
-                {
-                  key: "actions",
-                  header: locale === "tr" ? "İşlem" : "Action",
-                  render: (row) => {
-                    const existing = answerMap.get(row.id);
-                    return (
-                      <div className="flex gap-2">
-                        <Button
-                          size="sm"
-                          onClick={() => {
-                            const text = (document.getElementById(`text-${row.id}`) as HTMLInputElement | null)?.value || "";
-                            const num = (document.getElementById(`num-${row.id}`) as HTMLInputElement | null)?.value || "";
-                            void saveAnswer(row.id, text, num);
-                          }}
-                        >
-                          {locale === "tr" ? "Kaydet" : "Save"}
-                        </Button>
-                        {existing ? (
-                          <Button size="sm" variant="destructive" onClick={() => void deleteAnswer(existing.id)}>
-                            {locale === "tr" ? "Sil" : "Delete"}
-                          </Button>
-                        ) : null}
-                      </div>
-                    );
-                  },
-                },
-              ]}
-            />
+                  })}
+                </tbody>
+              </table>
+            </div>
           </CardContent>
         </Card>
       ) : null}

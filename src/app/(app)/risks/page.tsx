@@ -7,7 +7,16 @@ import { prisma } from "@/lib/prisma";
 export default async function RisksPage() {
   const { organization, reportingPeriod } = await getWorkspaceContext();
   if (!reportingPeriod) {
-    return <EmptyState title="No reporting period" description="Create one in Setup to manage climate risks." />;
+    return (
+      <EmptyState
+        title="No reporting period"
+        titleTr="Raporlama dönemi yok"
+        titleEn="No reporting period"
+        description="Create one in Setup to manage climate risks."
+        descriptionTr="İklim risklerini yönetmek için Kurulum bölümünde bir dönem oluşturun."
+        descriptionEn="Create one in Setup to manage climate risks."
+      />
+    );
   }
 
   const [facilities, users, risks] = await Promise.all([
@@ -22,7 +31,14 @@ export default async function RisksPage() {
 
   return (
     <div className="space-y-4">
-      <PageHeader title="Risks & Scenarios" description="Maintain climate risk register and scenario analysis." />
+      <PageHeader
+        title="Risks & Scenarios"
+        titleTr="Riskler ve Senaryolar"
+        titleEn="Risks & Scenarios"
+        description="Maintain climate risk register and scenario analysis."
+        descriptionTr="İklim risk envanterini ve senaryo analizini yönetin."
+        descriptionEn="Maintain climate risk register and scenario analysis."
+      />
       <RisksClient
         reportingPeriodId={reportingPeriod.id}
         facilities={facilities}

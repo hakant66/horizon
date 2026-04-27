@@ -18,7 +18,14 @@ export default async function MaterialityPage() {
 
   return (
     <div className="space-y-4">
-      <PageHeader title="Materiality" description="Score ESG topics and generate materiality matrix." />
+      <PageHeader
+        title="Materiality"
+        titleTr="Önemlilik"
+        titleEn="Materiality"
+        description="Score ESG topics and generate materiality matrix."
+        descriptionTr="ESG konularını puanlayın ve önemlilik matrisini oluşturun."
+        descriptionEn="Score ESG topics and generate materiality matrix."
+      />
       <MaterialityClient reportingPeriodId={reportingPeriod.id} topics={topics} />
     </div>
   );

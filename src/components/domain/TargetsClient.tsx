@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { DataTable } from "@/components/domain/DataTable";
 import { TargetProgressCard } from "@/components/domain/TargetProgressCard";
+import { useI18n } from "@/components/providers/LanguageProvider";
 
 export function TargetsClient({
   reportingPeriodId,
@@ -26,6 +27,7 @@ export function TargetsClient({
     metricDefinition: { name: string };
   }>;
 }) {
+  const { locale } = useI18n();
   const [message, setMessage] = useState("");
 
   async function createTarget(formData: FormData) {
@@ -35,7 +37,15 @@ export function TargetsClient({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ ...payload, reportingPeriodId }),
     });
-    setMessage(res.ok ? "Target created. Refresh to see latest list." : "Target creation failed");
+    setMessage(
+      res.ok
+        ? locale === "tr"
+          ? "Hedef oluşturuldu. Güncel liste için sayfayı yenileyin."
+          : "Target created. Refresh to see latest list."
+        : locale === "tr"
+          ? "Hedef oluşturma başarısız"
+          : "Target creation failed",
+    );
   }
 
   return (
@@ -45,13 +55,13 @@ export function TargetsClient({
       <DataTable
         data={targets}
         columns={[
-          { key: "name", header: "Target", render: (row) => row.name },
-          { key: "metric", header: "Metric", render: (row) => row.metricDefinition.name },
-          { key: "baseline", header: "Baseline", render: (row) => `${row.baselineYear} = ${row.baselineValue}` },
-          { key: "target", header: "Target", render: (row) => `${row.targetYear} = ${row.targetValue}` },
-          { key: "current", header: "Current", render: (row) => row.currentValue },
-          { key: "progress", header: "Progress", render: (row) => `${row.progress.toFixed(1)}%` },
-          { key: "status", header: "Status", render: (row) => row.status },
+          { key: "name", header: locale === "tr" ? "Hedef" : "Target", render: (row) => row.name },
+          { key: "metric", header: locale === "tr" ? "Metrik" : "Metric", render: (row) => row.metricDefinition.name },
+          { key: "baseline", header: locale === "tr" ? "Baz Değer" : "Baseline", render: (row) => `${row.baselineYear} = ${row.baselineValue}` },
+          { key: "target", header: locale === "tr" ? "Hedef" : "Target", render: (row) => `${row.targetYear} = ${row.targetValue}` },
+          { key: "current", header: locale === "tr" ? "Mevcut" : "Current", render: (row) => row.currentValue },
+          { key: "progress", header: locale === "tr" ? "İlerleme" : "Progress", render: (row) => `${row.progress.toFixed(1)}%` },
+          { key: "status", header: locale === "tr" ? "Durum" : "Status", render: (row) => row.status },
         ]}
       />
 
@@ -75,8 +85,8 @@ export function TargetsClient({
           void createTarget(new FormData(e.currentTarget));
         }}
       >
-        <h3 className="col-span-full text-sm font-semibold">Add Target</h3>
-        <Input name="name" placeholder="Target name" required />
+        <h3 className="col-span-full text-sm font-semibold">{locale === "tr" ? "Hedef Ekle" : "Add Target"}</h3>
+        <Input name="name" placeholder={locale === "tr" ? "Hedef adı" : "Target name"} required />
         <select name="metricDefinitionId" className="h-9 rounded-md border border-slate-300 px-3 text-sm">
           {metricDefinitions.map((metric) => (
             <option key={metric.id} value={metric.id}>
@@ -84,12 +94,12 @@ export function TargetsClient({
             </option>
           ))}
         </select>
-        <Input type="number" name="baselineYear" placeholder="Baseline year" required />
-        <Input type="number" step="0.0001" name="baselineValue" placeholder="Baseline value" required />
-        <Input type="number" name="targetYear" placeholder="Target year" required />
-        <Input type="number" step="0.0001" name="targetValue" placeholder="Target value" required />
-        <Input type="number" step="0.0001" name="currentValue" placeholder="Current value" required />
-        <Button type="submit">Create Target</Button>
+        <Input type="number" name="baselineYear" placeholder={locale === "tr" ? "Baz yıl" : "Baseline year"} required />
+        <Input type="number" step="0.0001" name="baselineValue" placeholder={locale === "tr" ? "Baz değer" : "Baseline value"} required />
+        <Input type="number" name="targetYear" placeholder={locale === "tr" ? "Hedef yıl" : "Target year"} required />
+        <Input type="number" step="0.0001" name="targetValue" placeholder={locale === "tr" ? "Hedef değer" : "Target value"} required />
+        <Input type="number" step="0.0001" name="currentValue" placeholder={locale === "tr" ? "Mevcut değer" : "Current value"} required />
+        <Button type="submit">{locale === "tr" ? "Hedef Oluştur" : "Create Target"}</Button>
       </form>
     </div>
   );

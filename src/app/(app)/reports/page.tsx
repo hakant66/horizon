@@ -7,7 +7,16 @@ import { prisma } from "@/lib/prisma";
 export default async function ReportsPage() {
   const { organization, reportingPeriod } = await getWorkspaceContext();
   if (!reportingPeriod) {
-    return <EmptyState title="No reporting period" description="Create one in Setup to start reporting." />;
+    return (
+      <EmptyState
+        title="No reporting period"
+        titleTr="Raporlama dönemi yok"
+        titleEn="No reporting period"
+        description="Create one in Setup to start reporting."
+        descriptionTr="Raporlamayı başlatmak için Kurulum bölümünde bir dönem oluşturun."
+        descriptionEn="Create one in Setup to start reporting."
+      />
+    );
   }
 
   const reports = await prisma.report.findMany({
@@ -17,7 +26,14 @@ export default async function ReportsPage() {
 
   return (
     <div className="space-y-4">
-      <PageHeader title="Reports" description="Generate and manage IFRS/TSRS-aligned disclosure reports." />
+      <PageHeader
+        title="Reports"
+        titleTr="Raporlar"
+        titleEn="Reports"
+        description="Generate and manage IFRS/TSRS-aligned disclosure reports."
+        descriptionTr="IFRS/TSRS uyumlu açıklama raporları oluşturun ve yönetin."
+        descriptionEn="Generate and manage IFRS/TSRS-aligned disclosure reports."
+      />
       <ReportsClient
         reportingPeriodId={reportingPeriod.id}
         reports={reports.map((r) => ({

@@ -6,6 +6,7 @@ import { DataTable } from "@/components/domain/DataTable";
 import { CalculationDetailsCard } from "@/components/domain/CalculationDetailsCard";
 import { EvidenceUploader } from "@/components/domain/EvidenceUploader";
 import { MetricCard } from "@/components/domain/MetricCard";
+import { useI18n } from "@/components/providers/LanguageProvider";
 
 type Calc = {
   id: string;
@@ -29,6 +30,7 @@ type MetricSeed = {
 };
 
 export function EmissionsClient({ calculations, metricsForRecalc }: { calculations: Calc[]; metricsForRecalc: MetricSeed[] }) {
+  const { locale } = useI18n();
   const [selected, setSelected] = useState<Calc | null>(calculations[0] || null);
   const [metricId, setMetricId] = useState(metricsForRecalc[0]?.id || "");
   const [message, setMessage] = useState("");
@@ -40,7 +42,15 @@ export function EmissionsClient({ calculations, metricsForRecalc }: { calculatio
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ metricEntryId: metricId }),
     });
-    setMessage(res.ok ? "Recalculation completed. Refresh page for latest results." : "Recalculation failed");
+    setMessage(
+      res.ok
+        ? locale === "tr"
+          ? "Yeniden hesaplama tamamlandı. En güncel sonuçlar için sayfayı yenileyin."
+          : "Recalculation completed. Refresh page for latest results."
+        : locale === "tr"
+          ? "Yeniden hesaplama başarısız"
+          : "Recalculation failed",
+    );
   }
 
   const total = calculations.reduce((sum, calc) => sum + Number(calc.resultTCO2e || 0), 0);
@@ -54,15 +64,20 @@ export function EmissionsClient({ calculations, metricsForRecalc }: { calculatio
   return (
     <div className="space-y-4">
       <p className="text-sm text-slate-600">
-        Scope 1 emissions are direct emissions from sources owned or controlled by the company. Scope 2 emissions are
-        indirect emissions from purchased electricity, steam, heating, or cooling.
+        {locale === "tr"
+          ? "Scope 1 emisyonları, şirketin sahip olduğu veya kontrol ettiği kaynaklardan doğrudan emisyonlardır. Scope 2 emisyonları satın alınan elektrik, buhar, ısıtma veya soğutmadan kaynaklanan dolaylı emisyonlardır."
+          : "Scope 1 emissions are direct emissions from sources owned or controlled by the company. Scope 2 emissions are indirect emissions from purchased electricity, steam, heating, or cooling."}
       </p>
-      <p className="text-xs text-amber-700">Placeholder/demo factors are shown below and must be verified before production use.</p>
+      <p className="text-xs text-amber-700">
+        {locale === "tr"
+          ? "Aşağıda yer alan katsayılar örnek/demo amaçlıdır ve canlı kullanım öncesinde doğrulanmalıdır."
+          : "Placeholder/demo factors are shown below and must be verified before production use."}
+      </p>
 
       <div className="grid gap-4 md:grid-cols-3">
-        <MetricCard title="Total Emissions" value={`${total.toFixed(2)} tCO2e`} />
-        <MetricCard title="Scope 1" value={`${scope1.toFixed(2)} tCO2e`} />
-        <MetricCard title="Scope 2" value={`${scope2.toFixed(2)} tCO2e`} />
+        <MetricCard title={locale === "tr" ? "Toplam Emisyon" : "Total Emissions"} value={`${total.toFixed(2)} tCO2e`} />
+        <MetricCard title={locale === "tr" ? "Scope 1" : "Scope 1"} value={`${scope1.toFixed(2)} tCO2e`} />
+        <MetricCard title={locale === "tr" ? "Scope 2" : "Scope 2"} value={`${scope2.toFixed(2)} tCO2e`} />
       </div>
 
       {message ? <p className="text-sm text-slate-600">{message}</p> : null}
@@ -75,19 +90,27 @@ export function EmissionsClient({ calculations, metricsForRecalc }: { calculatio
             </option>
           ))}
         </select>
-        <Button onClick={recalculate}>Recalculate</Button>
+        <Button onClick={recalculate}>{locale === "tr" ? "Yeniden Hesapla" : "Recalculate"}</Button>
       </div>
 
       <DataTable
         data={calculations}
         columns={[
-          { key: "facility", header: "Facility", render: (row) => row.metricEntry.facility.name },
-          { key: "metric", header: "Metric", render: (row) => row.metricEntry.metricDefinition.name },
-          { key: "scope", header: "Scope", render: (row) => row.emissionFactor.scope },
-          { key: "activity", header: "Activity", render: (row) => `${row.activityValue} ${row.activityUnit}` },
-          { key: "factor", header: "Factor", render: (row) => row.factorValue },
-          { key: "result", header: "Result", render: (row) => `${Number(row.resultTCO2e).toFixed(4)} tCO2e` },
-          { key: "actions", header: "Action", render: (row) => <Button size="sm" onClick={() => setSelected(row)}>Show Details</Button> },
+          { key: "facility", header: locale === "tr" ? "Tesis" : "Facility", render: (row) => row.metricEntry.facility.name },
+          { key: "metric", header: locale === "tr" ? "Metrik" : "Metric", render: (row) => row.metricEntry.metricDefinition.name },
+          { key: "scope", header: locale === "tr" ? "Kapsam" : "Scope", render: (row) => row.emissionFactor.scope },
+          { key: "activity", header: locale === "tr" ? "Aktivite" : "Activity", render: (row) => `${row.activityValue} ${row.activityUnit}` },
+          { key: "factor", header: locale === "tr" ? "Katsayı" : "Factor", render: (row) => row.factorValue },
+          { key: "result", header: locale === "tr" ? "Sonuç" : "Result", render: (row) => `${Number(row.resultTCO2e).toFixed(4)} tCO2e` },
+          {
+            key: "actions",
+            header: locale === "tr" ? "İşlem" : "Action",
+            render: (row) => (
+              <Button size="sm" onClick={() => setSelected(row)}>
+                {locale === "tr" ? "Detayları Göster" : "Show Details"}
+              </Button>
+            ),
+          },
         ]}
       />
 
@@ -102,7 +125,7 @@ export function EmissionsClient({ calculations, metricsForRecalc }: { calculatio
             version={String(selected.emissionFactor.versionYear)}
           />
           <div className="rounded-lg border border-slate-200 bg-white p-4">
-            <h3 className="mb-2 text-sm font-semibold">Attach Evidence</h3>
+            <h3 className="mb-2 text-sm font-semibold">{locale === "tr" ? "Kanıt Ekle" : "Attach Evidence"}</h3>
             <EvidenceUploader linkedEntityType="EMISSION_CALCULATION" linkedEntityId={selected.id} />
           </div>
         </div>

@@ -1,5 +1,8 @@
+"use client";
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { StatusBadge } from "@/components/domain/StatusBadge";
+import { useI18n } from "@/components/providers/LanguageProvider";
 
 export function RiskCard({
   name,
@@ -14,20 +17,22 @@ export function RiskCard({
   impact: string;
   owner?: string;
 }) {
+  const { locale } = useI18n();
+
   return (
     <Card>
       <CardHeader>
         <CardTitle>{name}</CardTitle>
       </CardHeader>
       <CardContent className="space-y-1 text-sm">
-        <p>Type: {type}</p>
+        <p>{locale === "tr" ? "Tür" : "Type"}: {type}</p>
         <p>
-          Probability: <StatusBadge status={probability} />
+          {locale === "tr" ? "Olasılık" : "Probability"}: <StatusBadge status={probability} />
         </p>
         <p>
-          Impact: <StatusBadge status={impact} />
+          {locale === "tr" ? "Etki" : "Impact"}: <StatusBadge status={impact} />
         </p>
-        <p>Owner: {owner || "Unassigned"}</p>
+        <p>{locale === "tr" ? "Sorumlu" : "Owner"}: {owner || (locale === "tr" ? "Atanmadı" : "Unassigned")}</p>
       </CardContent>
     </Card>
   );

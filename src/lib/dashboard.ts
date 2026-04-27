@@ -42,7 +42,7 @@ export async function getDashboardData(organizationId: string, reportingPeriodId
   const missingDataAlerts = requiredEntries
     .filter((entry) => entry.value === null)
     .slice(0, 5)
-    .map((entry) => `${entry.metricDefinition.name} missing for ${entry.facility.name}`);
+    .map((entry) => ({ metricName: entry.metricDefinition.name, facilityName: entry.facility.name }));
 
   const totalEmissionsTCO2e = await prisma.emissionCalculation.aggregate({
     where: { organizationId, ...periodWhere },

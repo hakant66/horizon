@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/domain/DataTable";
+import { useI18n } from "@/components/providers/LanguageProvider";
 
 export function CertificationClient({
   reportingPeriodId,
@@ -14,6 +15,7 @@ export function CertificationClient({
   reports: Array<{ id: string; framework: string }>;
   submissions: Array<{ id: string; status: string; report: { framework: string } }>;
 }) {
+  const { locale } = useI18n();
   const [reportId, setReportId] = useState(reports[0]?.id || "");
   const [message, setMessage] = useState("");
 
@@ -23,7 +25,15 @@ export function CertificationClient({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ reportId, reportingPeriodId }),
     });
-    setMessage(res.ok ? "Submission created. Refresh list." : "Submission creation failed");
+    setMessage(
+      res.ok
+        ? locale === "tr"
+          ? "Başvuru oluşturuldu. Listeyi yenileyin."
+          : "Submission created. Refresh list."
+        : locale === "tr"
+          ? "Başvuru oluşturma başarısız"
+          : "Submission creation failed",
+    );
   }
 
   return (
@@ -38,20 +48,20 @@ export function CertificationClient({
             </option>
           ))}
         </select>
-        <Button onClick={createSubmission}>Create Submission</Button>
+        <Button onClick={createSubmission}>{locale === "tr" ? "Başvuru Oluştur" : "Create Submission"}</Button>
       </div>
 
       <DataTable
         data={submissions}
         columns={[
-          { key: "report", header: "Report", render: (row) => row.report.framework },
-          { key: "status", header: "Status", render: (row) => row.status },
+          { key: "report", header: locale === "tr" ? "Rapor" : "Report", render: (row) => row.report.framework },
+          { key: "status", header: locale === "tr" ? "Durum" : "Status", render: (row) => row.status },
           {
             key: "actions",
-            header: "Actions",
+            header: locale === "tr" ? "İşlemler" : "Actions",
             render: (row) => (
               <Link className="text-sm font-medium text-blue-700" href={`/certification/${row.id}`}>
-                Open
+                {locale === "tr" ? "Aç" : "Open"}
               </Link>
             ),
           },

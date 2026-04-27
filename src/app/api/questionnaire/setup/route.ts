@@ -23,7 +23,17 @@ export async function GET(request: Request) {
         include: {
           sections: {
             include: {
-              subsections: true,
+              subsections: {
+                include: {
+                  questions: {
+                    include: {
+                      questionnaireTopic: true,
+                    },
+                    orderBy: { created_datetime: "asc" },
+                  },
+                },
+                orderBy: { orderIndex: "asc" },
+              },
               questions: {
                 include: {
                   questionnaireTopic: true,

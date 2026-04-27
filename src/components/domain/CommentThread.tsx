@@ -1,14 +1,19 @@
+"use client";
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useI18n } from "@/components/providers/LanguageProvider";
 
 export function CommentThread({
   comments,
 }: {
   comments: { id: string; author: string; comment: string; createdAt: string }[];
 }) {
+  const { locale } = useI18n();
+
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Comments</CardTitle>
+        <CardTitle>{locale === "tr" ? "Yorumlar" : "Comments"}</CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
         {comments.map((item) => (

@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { DataTable } from "@/components/domain/DataTable";
 import { MaterialityMatrix } from "@/components/domain/MaterialityMatrix";
 import { StatusBadge } from "@/components/domain/StatusBadge";
+import { useI18n } from "@/components/providers/LanguageProvider";
 
 type Topic = {
   id: string;
@@ -24,6 +25,7 @@ export function MaterialityClient({
   reportingPeriodId: string;
   topics: Topic[];
 }) {
+  const { locale } = useI18n();
   const [rows, setRows] = useState<Topic[]>(topics);
   const [message, setMessage] = useState("");
 
@@ -62,23 +64,33 @@ export function MaterialityClient({
         }),
       ),
     );
-    setMessage(responses.every((r) => r.ok) ? "Assessment saved" : "Some topics failed to save");
+    setMessage(
+      responses.every((r) => r.ok)
+        ? locale === "tr"
+          ? "Değerlendirme kaydedildi"
+          : "Assessment saved"
+        : locale === "tr"
+          ? "Bazı konular kaydedilemedi"
+          : "Some topics failed to save",
+    );
   }
 
   return (
     <div className="space-y-4">
       <p className="text-sm text-slate-600">
-        Materiality helps identify sustainability topics that may affect enterprise value or stakeholder impact.
+        {locale === "tr"
+          ? "Önemlilik, işletme değerini veya paydaş etkisini etkileyebilecek sürdürülebilirlik konularını belirlemeye yardımcı olur."
+          : "Materiality helps identify sustainability topics that may affect enterprise value or stakeholder impact."}
       </p>
       {message ? <p className="text-sm text-slate-600">{message}</p> : null}
 
       <DataTable
         data={rows}
         columns={[
-          { key: "topic", header: "ESG Topic", render: (row) => row.name },
+          { key: "topic", header: locale === "tr" ? "ESG Konusu" : "ESG Topic", render: (row) => row.name },
           {
             key: "financial",
-            header: "Financial Impact",
+            header: locale === "tr" ? "Finansal Etki" : "Financial Impact",
             render: (row) => (
               <Input
                 type="number"
@@ -91,7 +103,7 @@ export function MaterialityClient({
           },
           {
             key: "severity",
-            header: "Impact Severity",
+            header: locale === "tr" ? "Etki Şiddeti" : "Impact Severity",
             render: (row) => (
               <Input
                 type="number"
@@ -104,7 +116,7 @@ export function MaterialityClient({
           },
           {
             key: "likelihood",
-            header: "Likelihood",
+            header: locale === "tr" ? "Olasılık" : "Likelihood",
             render: (row) => (
               <Input
                 type="number"
@@ -117,7 +129,7 @@ export function MaterialityClient({
           },
           {
             key: "stakeholder",
-            header: "Stakeholder Concern",
+            header: locale === "tr" ? "Paydaş Endişesi" : "Stakeholder Concern",
             render: (row) => (
               <Input
                 type="number"
@@ -128,11 +140,15 @@ export function MaterialityClient({
               />
             ),
           },
-          { key: "material", header: "Material", render: (row) => <StatusBadge status={row.isMaterial ? "Material" : "Not Material"} /> },
+          {
+            key: "material",
+            header: locale === "tr" ? "Önemli" : "Material",
+            render: (row) => <StatusBadge status={row.isMaterial ? (locale === "tr" ? "Önemli" : "Material") : locale === "tr" ? "Önemli Değil" : "Not Material"} />,
+          },
         ]}
       />
 
-      <Button onClick={saveAll}>Save Assessment</Button>
+      <Button onClick={saveAll}>{locale === "tr" ? "Değerlendirmeyi Kaydet" : "Save Assessment"}</Button>
 
       <MaterialityMatrix
         points={rows.map((row) => ({

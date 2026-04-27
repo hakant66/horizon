@@ -12,7 +12,14 @@ export default async function SetupPage() {
 
   return (
     <div className="space-y-4">
-      <PageHeader title="Setup" description="Configure organization, facilities, users, and reporting periods." />
+      <PageHeader
+        title="Setup"
+        titleTr="Kurulum"
+        titleEn="Setup"
+        description="Configure organization, facilities, users, and reporting periods."
+        descriptionTr="Organizasyonu, tesisleri, kullanıcıları ve raporlama dönemlerini yapılandırın."
+        descriptionEn="Configure organization, facilities, users, and reporting periods."
+      />
       <SetupWizardClient organization={organization} facilities={facilities} users={users} />
     </div>
   );
