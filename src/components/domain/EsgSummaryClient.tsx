@@ -7,6 +7,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useI18n } from "@/components/providers/LanguageProvider";
+import {
+  ALL_SASB_SUBSECTORS,
+  REPORTING_FRAMEWORKS,
+  determineCsrdScope,
+} from "@/lib/sector-mappings";
 
 type EsgSummaryData = {
   legalName?: string | null;
@@ -61,7 +66,24 @@ function toFormDate(v: string | null | undefined): string {
   return v.slice(0, 10);
 }
 
-export function EsgSummaryClient({ initial }: { initial: EsgSummaryData | null }) {
+type OrgContext = {
+  sasbSector?: string | null;
+  naceCode?: string | null;
+  csrdSector?: string | null;
+  reportingFrameworks?: string[];
+  employeeCount?: number | null;
+  annualTurnoverEurM?: number | null;
+  totalAssetsEurM?: number | null;
+  isPublicInterestEntity?: boolean | null;
+};
+
+export function EsgSummaryClient({
+  initial,
+  orgContext,
+}: {
+  initial: EsgSummaryData | null;
+  orgContext?: OrgContext;
+}) {
   const { locale } = useI18n();
   const tr = locale === "tr";
 
@@ -111,6 +133,11 @@ export function EsgSummaryClient({ initial }: { initial: EsgSummaryData | null }
         >
           {message.text}
         </div>
+      )}
+
+      {/* Sector Context Banner */}
+      {orgContext && (
+        <SectorContextBanner orgContext={orgContext} locale={locale} />
       )}
 
       {/* 1. Kurumsal Kimlik ve Operasyonel Yapı */}
@@ -537,6 +564,66 @@ export function EsgSummaryClient({ initial }: { initial: EsgSummaryData | null }
         <Button onClick={handleSave} disabled={saving}>
           {saving ? (tr ? "Kaydediliyor..." : "Saving...") : tr ? "ESG Özetini Kaydet" : "Save ESG Summary"}
         </Button>
+      </div>
+    </div>
+  );
+}
+
+function SectorContextBanner({ orgContext, locale }: { orgContext: OrgContext; locale: string }) {
+  const tr = locale === "tr";
+  const subsector = orgContext.sasbSector
+    ? ALL_SASB_SUBSECTORS.find((s) => s.sics === orgContext.sasbSector)
+    : null;
+
+  const csrdScope = determineCsrdScope({
+    employees: orgContext.employeeCount ?? null,
+    turnoverEurM: orgContext.annualTurnoverEurM ?? null,
+    assetsEurM: orgContext.totalAssetsEurM ?? null,
+    isPublicInterestEntity: orgContext.isPublicInterestEntity ?? null,
+  });
+
+  const csrdColor =
+    csrdScope === "LARGE_COMPANY" ? "bg-red-50 border-red-200 text-red-700" :
+    csrdScope === "LISTED_SME"    ? "bg-yellow-50 border-yellow-200 text-yellow-700" :
+    "bg-green-50 border-green-200 text-green-700";
+
+  const csrdLabel =
+    csrdScope === "LARGE_COMPANY" ? (tr ? "CSRD Kapsamında (Büyük Şirket)" : "In CSRD Scope (Large Company)") :
+    csrdScope === "LISTED_SME"    ? (tr ? "CSRD Kapsamında (KOBİ)" : "In CSRD Scope (Listed SME)") :
+    (tr ? "CSRD Kapsam Dışı" : "Out of CSRD Scope");
+
+  const frameworks = (orgContext.reportingFrameworks ?? [])
+    .map((fw) => REPORTING_FRAMEWORKS.find((f) => f.value === fw)?.[tr ? "label_tr" : "label_en"] ?? fw)
+    .join(" · ");
+
+  if (!orgContext.sasbSector && !orgContext.naceCode && !(orgContext.reportingFrameworks?.length)) {
+    return (
+      <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
+        {tr
+          ? "Sektör bilgisi henüz tanımlanmamış. Kurulum adımında NACE kodu ve SASB sektörü belirleyerek raporlama akışını özelleştirin."
+          : "Sector information not yet configured. Go to Setup to define your NACE code and SASB sector to tailor the reporting workflow."}
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-md border border-slate-200 bg-slate-50 px-4 py-3 text-sm">
+      <p className="mb-2 font-semibold text-slate-700">{tr ? "Aktif Sektör & Raporlama Çerçevesi" : "Active Sector & Reporting Framework"}</p>
+      <div className="flex flex-wrap gap-x-6 gap-y-1 text-slate-600">
+        {orgContext.naceCode && (
+          <span><span className="font-medium">NACE:</span> {orgContext.naceCode}</span>
+        )}
+        {subsector && (
+          <span>
+            <span className="font-medium">SASB:</span> {subsector.sics} — {tr ? subsector.label_tr : subsector.label_en}
+          </span>
+        )}
+        {frameworks && (
+          <span><span className="font-medium">{tr ? "Çerçeveler:" : "Frameworks:"}</span> {frameworks}</span>
+        )}
+        <span className={`rounded-full border px-2 py-0.5 text-xs font-semibold ${csrdColor}`}>
+          {csrdLabel}
+        </span>
       </div>
     </div>
   );

@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { metricEntrySchema } from "@/lib/validation";
 import { apiError, apiOk } from "@/lib/api";
 import { createAuditLog } from "@/lib/audit";
+import { getSectorMetricCodes } from "@/lib/sector-mappings";
 
 export async function GET(request: Request) {
   try {
@@ -12,11 +13,19 @@ export async function GET(request: Request) {
     const reportingPeriodId = searchParams.get("reportingPeriodId") || undefined;
     const facilityId = searchParams.get("facilityId") || undefined;
 
+    // Fetch org to get SASB sector for metric filtering
+    const org = await prisma.organization.findUnique({
+      where: { id: user.organizationId },
+      select: { sasbSector: true },
+    });
+    const sectorMetricCodes = getSectorMetricCodes(org?.sasbSector);
+
     const entries = await prisma.metricEntry.findMany({
       where: {
         organizationId: user.organizationId,
         ...(reportingPeriodId ? { reportingPeriodId } : {}),
         ...(facilityId ? { facilityId } : {}),
+        metricDefinition: { code: { in: sectorMetricCodes } },
       },
       include: {
         facility: true,

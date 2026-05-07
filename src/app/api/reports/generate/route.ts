@@ -3,27 +3,44 @@ import { requireRole } from "@/lib/rbac";
 import { prisma } from "@/lib/prisma";
 import { apiError, apiOk } from "@/lib/api";
 import { createAuditLog } from "@/lib/audit";
+import { getSectorReportTemplates } from "@/lib/sector-mappings";
 
 export async function POST(request: Request) {
   try {
     const user = await requireRole(["ADMIN", "SUSTAINABILITY_MANAGER"]);
     const { reportId } = (await request.json()) as { reportId: string };
 
-    const report = await prisma.report.findFirstOrThrow({ where: { id: reportId, organizationId: user.organizationId } });
-    const metrics = await prisma.metricEntry.count({ where: { organizationId: user.organizationId, reportingPeriodId: report.reportingPeriodId } });
-    const emissions = await prisma.emissionCalculation.count({ where: { organizationId: user.organizationId, reportingPeriodId: report.reportingPeriodId } });
-    const risks = await prisma.climateRisk.count({ where: { organizationId: user.organizationId, reportingPeriodId: report.reportingPeriodId } });
+    const [report, org] = await Promise.all([
+      prisma.report.findFirstOrThrow({ where: { id: reportId, organizationId: user.organizationId } }),
+      prisma.organization.findUnique({
+        where: { id: user.organizationId },
+        select: { sasbSector: true, reportingFrameworks: true },
+      }),
+    ]);
+
+    const [metrics, emissions, risks] = await Promise.all([
+      prisma.metricEntry.count({ where: { organizationId: user.organizationId, reportingPeriodId: report.reportingPeriodId } }),
+      prisma.emissionCalculation.count({ where: { organizationId: user.organizationId, reportingPeriodId: report.reportingPeriodId } }),
+      prisma.climateRisk.count({ where: { organizationId: user.organizationId, reportingPeriodId: report.reportingPeriodId } }),
+    ]);
+
+    const templates = getSectorReportTemplates(
+      org?.sasbSector,
+      org?.reportingFrameworks ?? [],
+      metrics,
+      emissions,
+      risks,
+    );
 
     const generated = await prisma.report.update({
       where: { id: report.id },
       data: {
         status: ReportStatus.GENERATED,
         generatedAt: new Date(),
-        governanceText: report.governanceText || "Governance oversight established through cross-functional committees.",
-        strategyText: report.strategyText || `Strategy considers ${risks} climate risks for resilience planning.`,
-        riskManagementText: report.riskManagementText || `Risk processes cover ${risks} documented climate risks.`,
-        metricsTargetsText:
-          report.metricsTargetsText || `${metrics} metric records and ${emissions} emissions calculations included in this disclosure package.`,
+        governanceText:    report.governanceText    || templates.governanceText,
+        strategyText:      report.strategyText      || templates.strategyText,
+        riskManagementText: report.riskManagementText || templates.riskManagementText,
+        metricsTargetsText: report.metricsTargetsText || templates.metricsTargetsText,
       },
     });
 

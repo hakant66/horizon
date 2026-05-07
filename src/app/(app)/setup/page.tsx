@@ -20,7 +20,15 @@ export default async function SetupPage() {
         descriptionTr="Organizasyonu, tesisleri, kullanıcıları ve raporlama dönemlerini yapılandırın."
         descriptionEn="Configure organization, facilities, users, and reporting periods."
       />
-      <SetupWizardClient organization={organization} facilities={facilities} users={users} />
+      <SetupWizardClient
+        organization={{
+          ...organization,
+          annualTurnoverEurM: organization.annualTurnoverEurM ? Number(organization.annualTurnoverEurM) : null,
+          totalAssetsEurM: organization.totalAssetsEurM ? Number(organization.totalAssetsEurM) : null,
+        }}
+        facilities={facilities}
+        users={users}
+      />
     </div>
   );
 }

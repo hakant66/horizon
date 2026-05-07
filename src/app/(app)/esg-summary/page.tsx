@@ -8,9 +8,10 @@ export default async function EsgSummaryPage() {
   const session = await getAuthSession();
   if (!session?.user) redirect("/login");
 
-  const summary = await prisma.esgSummary.findUnique({
-    where: { organizationId: session.user.organizationId },
-  });
+  const [summary, org] = await Promise.all([
+    prisma.esgSummary.findUnique({ where: { organizationId: session.user.organizationId } }),
+    prisma.organization.findUniqueOrThrow({ where: { id: session.user.organizationId } }),
+  ]);
 
   const serialized = summary
     ? {
@@ -22,15 +23,9 @@ export default async function EsgSummaryPage() {
         netProfit: summary.netProfit ? Number(summary.netProfit) : null,
         totalAssets: summary.totalAssets ? Number(summary.totalAssets) : null,
         totalEquity: summary.totalEquity ? Number(summary.totalEquity) : null,
-        sustainabilityCapexForecast: summary.sustainabilityCapexForecast
-          ? Number(summary.sustainabilityCapexForecast)
-          : null,
-        annualElectricityConsumption: summary.annualElectricityConsumption
-          ? Number(summary.annualElectricityConsumption)
-          : null,
-        annualNaturalGasConsumption: summary.annualNaturalGasConsumption
-          ? Number(summary.annualNaturalGasConsumption)
-          : null,
+        sustainabilityCapexForecast: summary.sustainabilityCapexForecast ? Number(summary.sustainabilityCapexForecast) : null,
+        annualElectricityConsumption: summary.annualElectricityConsumption ? Number(summary.annualElectricityConsumption) : null,
+        annualNaturalGasConsumption: summary.annualNaturalGasConsumption ? Number(summary.annualNaturalGasConsumption) : null,
         annualFuelConsumption: summary.annualFuelConsumption ? Number(summary.annualFuelConsumption) : null,
         renewableEnergyPercent: summary.renewableEnergyPercent ? Number(summary.renewableEnergyPercent) : null,
         scope1Emissions: summary.scope1Emissions ? Number(summary.scope1Emissions) : null,
@@ -39,14 +34,23 @@ export default async function EsgSummaryPage() {
         annualWaterWithdrawal: summary.annualWaterWithdrawal ? Number(summary.annualWaterWithdrawal) : null,
         wasteRecyclingRate: summary.wasteRecyclingRate ? Number(summary.wasteRecyclingRate) : null,
         lostTimeInjuryRate: summary.lostTimeInjuryRate ? Number(summary.lostTimeInjuryRate) : null,
-        avgTrainingHoursPerEmployee: summary.avgTrainingHoursPerEmployee
-          ? Number(summary.avgTrainingHoursPerEmployee)
-          : null,
+        avgTrainingHoursPerEmployee: summary.avgTrainingHoursPerEmployee ? Number(summary.avgTrainingHoursPerEmployee) : null,
         femaleManagerPercent: summary.femaleManagerPercent ? Number(summary.femaleManagerPercent) : null,
         employeeTurnoverRate: summary.employeeTurnoverRate ? Number(summary.employeeTurnoverRate) : null,
         rdExpenditure: summary.rdExpenditure ? Number(summary.rdExpenditure) : null,
       }
     : null;
+
+  const orgContext = {
+    sasbSector: org.sasbSector,
+    naceCode: org.naceCode,
+    csrdSector: org.csrdSector,
+    reportingFrameworks: org.reportingFrameworks,
+    employeeCount: org.employeeCount,
+    annualTurnoverEurM: org.annualTurnoverEurM ? Number(org.annualTurnoverEurM) : null,
+    totalAssetsEurM: org.totalAssetsEurM ? Number(org.totalAssetsEurM) : null,
+    isPublicInterestEntity: org.isPublicInterestEntity,
+  };
 
   return (
     <div className="space-y-4">
@@ -58,7 +62,7 @@ export default async function EsgSummaryPage() {
         descriptionTr="Raporlama sınırı ve sürdürülebilirlik açıklamaları için temel ESG verilerini toplayın ve yönetin."
         descriptionEn="Collect and manage key ESG data for reporting boundary and sustainability disclosures."
       />
-      <EsgSummaryClient initial={serialized} />
+      <EsgSummaryClient initial={serialized} orgContext={orgContext} />
     </div>
   );
 }

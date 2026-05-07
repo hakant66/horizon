@@ -3,6 +3,7 @@ import { MaterialityClient } from "@/components/domain/MaterialityClient";
 import { EmptyState } from "@/components/domain/EmptyState";
 import { getWorkspaceContext } from "@/lib/context";
 import { prisma } from "@/lib/prisma";
+import { getDefaultMaterialityTopics } from "@/lib/sector-mappings";
 
 export default async function MaterialityPage() {
   const { organization, reportingPeriod } = await getWorkspaceContext();
@@ -16,6 +17,9 @@ export default async function MaterialityPage() {
     orderBy: { name: "asc" },
   });
 
+  // Derive sector-specific suggested topics — used client-side to pre-populate new rows
+  const suggestedTopics = getDefaultMaterialityTopics(organization.sasbSector);
+
   return (
     <div className="space-y-4">
       <PageHeader
@@ -26,7 +30,12 @@ export default async function MaterialityPage() {
         descriptionTr="ESG konularını puanlayın ve önemlilik matrisini oluşturun."
         descriptionEn="Score ESG topics and generate materiality matrix."
       />
-      <MaterialityClient reportingPeriodId={reportingPeriod.id} topics={topics} />
+      <MaterialityClient
+        reportingPeriodId={reportingPeriod.id}
+        topics={topics}
+        suggestedTopics={suggestedTopics}
+        sasbSector={organization.sasbSector ?? null}
+      />
     </div>
   );
 }
