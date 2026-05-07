@@ -96,14 +96,23 @@ enum QuestionnaireType {
 }
 
 model Organization {
-  id                  String   @id @default(cuid())
-  name                String
-  taxId               String?
-  sector              String
-  headquartersCountry String
-  reportingCurrency   String
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
+  id                     String   @id @default(cuid())
+  name                   String
+  taxId                  String?
+  sector                 String
+  naceCode               String?
+  naceDescription        String?
+  sasbSector             String?
+  csrdSector             String?
+  reportingFrameworks    String[]
+  employeeCount          Int?
+  annualTurnoverEurM     Decimal? @db.Decimal(12, 2)
+  totalAssetsEurM        Decimal? @db.Decimal(12, 2)
+  isPublicInterestEntity Boolean?
+  headquartersCountry    String
+  reportingCurrency      String
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
 
   users                    User[]
   facilities               Facility[]
