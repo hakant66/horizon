@@ -23,6 +23,7 @@ export const dictionary = {
     questionnaireSetup: "Anket Kurulumu",
     questionnaireAnswers: "Anket Yanıtları",
     questionnaireDashboard: "Anket Panosu",
+    esgSummary: "ESG Özet Bilgileri",
   },
   en: {
     workflow: "Workflow",
@@ -45,6 +46,7 @@ export const dictionary = {
     questionnaireSetup: "Questionnaire Setup",
     questionnaireAnswers: "Questionnaire Answers",
     questionnaireDashboard: "Questionnaire Dashboard",
+    esgSummary: "ESG Summary",
   },
 } as const;
 

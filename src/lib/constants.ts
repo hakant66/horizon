@@ -1,6 +1,7 @@
 export const NAV_ITEMS = [
   { href: "/dashboard", labelKey: "home" },
   { href: "/setup", labelKey: "setup" },
+  { href: "/esg-summary", labelKey: "esgSummary" },
   { href: "/questionnaire", labelKey: "questionnaire" },
   { href: "/materiality", labelKey: "materiality" },
   { href: "/data-collection", labelKey: "dataCollection" },

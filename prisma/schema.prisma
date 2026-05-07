@@ -123,6 +123,7 @@ model Organization {
   questionnaireQuestions   QuestionnaireQuestion[]
   questionnaireAnswers     QuestionnaireAnswer[]
   auditLogs                AuditLog[]
+  esgSummary               EsgSummary?
 }
 
 model User {
@@ -543,6 +544,61 @@ model QuestionnaireAnswer {
 
   @@unique([questionnaireQuestionId, reportingPeriodId])
   @@index([organizationId, questionnaireId])
+}
+
+model EsgSummary {
+  id             String   @id @default(cuid())
+  organizationId String   @unique
+  // 1. Kurumsal Kimlik ve Operasyonel Yapı
+  legalName                   String?
+  brandPortfolio               String?
+  naceCode                     String?
+  sectorDescription            String?
+  operatingCountries           String?
+  totalEmployees               Int?
+  employeeBlueCollar           Int?
+  employeeWhiteCollar          Int?
+  employeeMale                 Int?
+  employeeFemale               Int?
+  employeePermanent            Int?
+  employeeTemporary            Int?
+  // 2. Finansal Temeller
+  fiscalYearStart              DateTime?
+  fiscalYearEnd                DateTime?
+  annualRevenue                Decimal?  @db.Decimal(20, 2)
+  ebitda                       Decimal?  @db.Decimal(20, 2)
+  netProfit                    Decimal?  @db.Decimal(20, 2)
+  totalAssets                  Decimal?  @db.Decimal(20, 2)
+  totalEquity                  Decimal?  @db.Decimal(20, 2)
+  sustainabilityCapexForecast  Decimal?  @db.Decimal(20, 2)
+  // 3. Yönetişim ve Stratejik Yaklaşım
+  sustainabilityGovernanceBody  String?
+  businessResilienceAssessment  String?
+  antiBriberyPolicyUpdated      Boolean?
+  gdprKvkkPolicyUpdated         Boolean?
+  // 4. Çevresel ve İklimsel Veriler
+  annualElectricityConsumption  Decimal?  @db.Decimal(14, 4)
+  annualNaturalGasConsumption   Decimal?  @db.Decimal(14, 4)
+  annualFuelConsumption         Decimal?  @db.Decimal(14, 4)
+  renewableEnergyPercent        Decimal?  @db.Decimal(5, 2)
+  scope1Emissions               Decimal?  @db.Decimal(14, 4)
+  scope2Emissions               Decimal?  @db.Decimal(14, 4)
+  scope3Emissions               Decimal?  @db.Decimal(14, 4)
+  annualWaterWithdrawal         Decimal?  @db.Decimal(14, 4)
+  wasteRecyclingRate            Decimal?  @db.Decimal(5, 2)
+  // 5. Sosyal ve Beşeri Sermaye
+  lostTimeInjuryRate            Decimal?  @db.Decimal(8, 4)
+  avgTrainingHoursPerEmployee   Decimal?  @db.Decimal(8, 2)
+  femaleManagerPercent          Decimal?  @db.Decimal(5, 2)
+  supplierSocialAuditConducted  Boolean?
+  employeeTurnoverRate          Decimal?  @db.Decimal(5, 2)
+  climateRiskInRiskRegister     Boolean?
+  rdExpenditure                 Decimal?  @db.Decimal(20, 2)
+  reportBoundaryNote            String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 }
 
 model AuditLog {
