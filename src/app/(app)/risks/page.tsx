@@ -20,8 +20,16 @@ export default async function RisksPage() {
   }
 
   const [facilities, users, risks] = await Promise.all([
-    prisma.facility.findMany({ where: { organizationId: organization.id }, select: { id: true, name: true }, orderBy: { name: "asc" } }),
-    prisma.user.findMany({ where: { organizationId: organization.id }, select: { id: true, name: true }, orderBy: { name: "asc" } }),
+    prisma.facility.findMany({
+      where: { organizationId: organization.id },
+      select: { id: true, name: true },
+      orderBy: { name: "asc" },
+    }),
+    prisma.user.findMany({
+      where: { organizationId: organization.id },
+      select: { id: true, name: true },
+      orderBy: { name: "asc" },
+    }),
     prisma.climateRisk.findMany({
       where: { organizationId: organization.id, reportingPeriodId: reportingPeriod.id },
       include: { facility: true, ownerUser: { select: { name: true } }, scenarios: true },
@@ -35,9 +43,9 @@ export default async function RisksPage() {
         title="Risks & Scenarios"
         titleTr="Riskler ve Senaryolar"
         titleEn="Risks & Scenarios"
-        description="Maintain climate risk register and scenario analysis."
-        descriptionTr="İklim risk envanterini ve senaryo analizini yönetin."
-        descriptionEn="Maintain climate risk register and scenario analysis."
+        description="Climate risk register, scenario analysis, and AI-powered risk identification."
+        descriptionTr="İklim risk envanteri, senaryo analizi ve AI destekli risk tespiti."
+        descriptionEn="Climate risk register, scenario analysis, and AI-powered risk identification."
       />
       <RisksClient
         reportingPeriodId={reportingPeriod.id}
@@ -45,9 +53,12 @@ export default async function RisksPage() {
         users={users}
         risks={risks.map((risk) => ({
           ...risk,
+          financialImpactEstimate: risk.financialImpactEstimate?.toString() ?? null,
+          aiNarrativeAt: risk.aiNarrativeAt?.toISOString() ?? null,
           scenarios: risk.scenarios.map((s) => ({
             ...s,
-            estimatedRevenueImpactPercent: s.estimatedRevenueImpactPercent?.toString() || null,
+            estimatedRevenueImpactPercent: s.estimatedRevenueImpactPercent?.toString() ?? null,
+            estimatedCostImpact: s.estimatedCostImpact?.toString() ?? null,
           })),
         }))}
       />

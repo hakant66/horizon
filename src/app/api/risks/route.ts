@@ -26,6 +26,9 @@ export async function POST(request: Request) {
     const user = await requireRole(["ADMIN", "SUSTAINABILITY_MANAGER", "FINANCE_REVIEWER"]);
     const payload = climateRiskSchema.parse(await request.json());
 
+    const probScore = payload.probabilityScore ?? probabilityToScore(payload.probability);
+    const impScore = payload.impactScore ?? probabilityToScore(payload.impact);
+
     const risk = await prisma.climateRisk.create({
       data: {
         organizationId: user.organizationId,
@@ -35,13 +38,18 @@ export async function POST(request: Request) {
         type: payload.type,
         probability: payload.probability,
         impact: payload.impact,
+        probabilityScore: probScore,
+        impactScore: impScore,
+        riskScore: probScore * impScore,
+        timeHorizon: payload.timeHorizon ?? null,
+        status: payload.status ?? "Open",
+        residualRisk: payload.residualRisk ?? null,
+        regulatoryRef: payload.regulatoryRef ?? null,
         financialImpactEstimate:
-          payload.financialImpactEstimate === null || payload.financialImpactEstimate === undefined
-            ? null
-            : new Prisma.Decimal(payload.financialImpactEstimate),
+          payload.financialImpactEstimate == null ? null : new Prisma.Decimal(payload.financialImpactEstimate),
         ownerUserId: payload.ownerUserId || null,
-        mitigationPlan: payload.mitigationPlan,
-        notes: payload.notes,
+        mitigationPlan: payload.mitigationPlan ?? null,
+        notes: payload.notes ?? null,
       },
     });
 
@@ -65,7 +73,13 @@ export async function PATCH(request: Request) {
     const payload = climateRiskSchema.parse(await request.json());
     if (!payload.id) throw new Error("id is required");
 
-    const before = await prisma.climateRisk.findFirstOrThrow({ where: { id: payload.id, organizationId: user.organizationId } });
+    const before = await prisma.climateRisk.findFirstOrThrow({
+      where: { id: payload.id, organizationId: user.organizationId },
+    });
+
+    const probScore = payload.probabilityScore ?? probabilityToScore(payload.probability);
+    const impScore = payload.impactScore ?? probabilityToScore(payload.impact);
+
     const risk = await prisma.climateRisk.update({
       where: { id: payload.id },
       data: {
@@ -73,14 +87,19 @@ export async function PATCH(request: Request) {
         type: payload.type,
         probability: payload.probability,
         impact: payload.impact,
+        probabilityScore: probScore,
+        impactScore: impScore,
+        riskScore: probScore * impScore,
+        timeHorizon: payload.timeHorizon ?? null,
+        status: payload.status ?? "Open",
+        residualRisk: payload.residualRisk ?? null,
+        regulatoryRef: payload.regulatoryRef ?? null,
         financialImpactEstimate:
-          payload.financialImpactEstimate === null || payload.financialImpactEstimate === undefined
-            ? null
-            : new Prisma.Decimal(payload.financialImpactEstimate),
+          payload.financialImpactEstimate == null ? null : new Prisma.Decimal(payload.financialImpactEstimate),
         facilityId: payload.facilityId || null,
         ownerUserId: payload.ownerUserId || null,
-        mitigationPlan: payload.mitigationPlan,
-        notes: payload.notes,
+        mitigationPlan: payload.mitigationPlan ?? null,
+        notes: payload.notes ?? null,
       },
     });
 
@@ -103,7 +122,9 @@ export async function DELETE(request: Request) {
   try {
     const user = await requireRole(["ADMIN", "SUSTAINABILITY_MANAGER"]);
     const { id } = (await request.json()) as { id: string };
-    const before = await prisma.climateRisk.findFirstOrThrow({ where: { id, organizationId: user.organizationId } });
+    const before = await prisma.climateRisk.findFirstOrThrow({
+      where: { id, organizationId: user.organizationId },
+    });
     await prisma.climateRisk.delete({ where: { id } });
     await createAuditLog({
       organizationId: user.organizationId,
@@ -116,5 +137,14 @@ export async function DELETE(request: Request) {
     return apiOk({ success: true });
   } catch (error) {
     return apiError(error, 400);
+  }
+}
+
+function probabilityToScore(level: string): number {
+  switch (level) {
+    case "High":   return 4;
+    case "Medium": return 2;
+    case "Low":    return 1;
+    default:       return 2;
   }
 }

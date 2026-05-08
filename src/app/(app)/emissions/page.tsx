@@ -51,6 +51,7 @@ export default async function EmissionsPage() {
           activityValue: row.activityValue.toString(),
           factorValue: row.factorValue.toString(),
           resultTCO2e: row.resultTCO2e.toString(),
+          scope3Category: row.scope3Category ?? null,
         }))}
         metricsForRecalc={metricsForRecalc.map((m) => ({ ...m, value: m.value?.toString() || null }))}
       />

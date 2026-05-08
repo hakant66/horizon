@@ -44,15 +44,42 @@ type QuestionnaireSeedData = Array<{
 }>;
 
 const metricDefinitions = [
-  { code: "electricity_consumption", name: "Electricity consumption", category: "Energy", unit: "kWh", isRequired: true },
-  { code: "natural_gas_consumption", name: "Natural gas consumption", category: "Energy", unit: "m3", isRequired: true },
-  { code: "diesel_consumption", name: "Diesel consumption", category: "Fuel", unit: "L", isRequired: true },
-  { code: "petrol_consumption", name: "Petrol consumption", category: "Fuel", unit: "L", isRequired: true },
-  { code: "water_consumption", name: "Water consumption", category: "Water", unit: "m3", isRequired: true },
-  { code: "waste_generated", name: "Waste generated", category: "Waste", unit: "kg", isRequired: true },
-  { code: "waste_recycled", name: "Waste recycled", category: "Waste", unit: "kg", isRequired: true },
-  { code: "employee_count", name: "Employee count", category: "Social", unit: "count", isRequired: true },
-  { code: "lost_time_injury_count", name: "Lost time injury count", category: "Social", unit: "count", isRequired: true },
+  // Scope 1 — Direct
+  { code: "natural_gas_consumption",        name: "Natural gas consumption",        category: "Energy",   unit: "m3",   isRequired: true,  sector: null },
+  { code: "diesel_consumption",             name: "Diesel consumption",             category: "Fuel",     unit: "L",    isRequired: true,  sector: null },
+  { code: "petrol_consumption",             name: "Petrol consumption",             category: "Fuel",     unit: "L",    isRequired: true,  sector: null },
+  { code: "lpg_consumption",                name: "LPG consumption",                category: "Fuel",     unit: "L",    isRequired: false, sector: null },
+  { code: "fuel_oil_consumption",           name: "Fuel oil consumption",           category: "Fuel",     unit: "L",    isRequired: false, sector: null },
+  // Scope 2 — Purchased energy
+  { code: "electricity_consumption",        name: "Electricity consumption",        category: "Energy",   unit: "kWh",  isRequired: true,  sector: null },
+  { code: "district_heat_consumption",      name: "District heat/steam consumption",category: "Energy",   unit: "kWh",  isRequired: false, sector: null },
+  // Scope 3 — Category 1: Purchased Goods & Services (spend-based)
+  { code: "s3_purchased_goods_spend",       name: "S3 Cat.1 — Purchased goods & services (spend)", category: "Scope3", unit: "kUSD", isRequired: false, sector: null },
+  // Scope 3 — Category 3: Fuel & Energy Related Activities
+  { code: "s3_fuel_energy_related",         name: "S3 Cat.3 — Fuel & energy upstream losses",     category: "Scope3", unit: "kWh",  isRequired: false, sector: null },
+  // Scope 3 — Category 4: Upstream Transportation & Distribution
+  { code: "s3_upstream_logistics_tkm",      name: "S3 Cat.4 — Upstream logistics (ton-km)",        category: "Scope3", unit: "ton-km", isRequired: false, sector: null },
+  // Scope 3 — Category 5: Waste Generated in Operations
+  { code: "s3_waste_to_landfill",           name: "S3 Cat.5 — Waste to landfill",                  category: "Scope3", unit: "kg",   isRequired: false, sector: null },
+  { code: "s3_waste_incinerated",           name: "S3 Cat.5 — Waste incinerated",                  category: "Scope3", unit: "kg",   isRequired: false, sector: null },
+  // Scope 3 — Category 6: Business Travel
+  { code: "s3_business_travel_air_short",   name: "S3 Cat.6 — Business travel air (short haul)",   category: "Scope3", unit: "km",   isRequired: false, sector: null },
+  { code: "s3_business_travel_air_long",    name: "S3 Cat.6 — Business travel air (long haul)",    category: "Scope3", unit: "km",   isRequired: false, sector: null },
+  { code: "s3_business_travel_rail",        name: "S3 Cat.6 — Business travel rail",               category: "Scope3", unit: "km",   isRequired: false, sector: null },
+  { code: "s3_business_travel_car",         name: "S3 Cat.6 — Business travel car",                category: "Scope3", unit: "km",   isRequired: false, sector: null },
+  // Scope 3 — Category 7: Employee Commuting
+  { code: "s3_employee_commute_car",        name: "S3 Cat.7 — Employee commuting by car",          category: "Scope3", unit: "km",   isRequired: false, sector: null },
+  { code: "s3_employee_commute_transit",    name: "S3 Cat.7 — Employee commuting by public transit",category: "Scope3", unit: "km",   isRequired: false, sector: null },
+  // Scope 3 — Category 9: Downstream Transportation
+  { code: "s3_downstream_logistics_tkm",    name: "S3 Cat.9 — Downstream logistics (ton-km)",      category: "Scope3", unit: "ton-km", isRequired: false, sector: null },
+  // Scope 3 — Category 11: Use of Sold Products
+  { code: "s3_product_energy_use_kwh",      name: "S3 Cat.11 — Use of sold products (energy)",    category: "Scope3", unit: "kWh",  isRequired: false, sector: null },
+  // Social (unchanged)
+  { code: "water_consumption",              name: "Water consumption",              category: "Water",    unit: "m3",   isRequired: true,  sector: null },
+  { code: "waste_generated",               name: "Waste generated",               category: "Waste",    unit: "kg",   isRequired: true,  sector: null },
+  { code: "waste_recycled",                name: "Waste recycled",                category: "Waste",    unit: "kg",   isRequired: true,  sector: null },
+  { code: "employee_count",               name: "Employee count",                category: "Social",   unit: "count",isRequired: true,  sector: null },
+  { code: "lost_time_injury_count",        name: "Lost time injury count",        category: "Social",   unit: "count",isRequired: true,  sector: null },
 ];
 
 const materialityTopics = [
@@ -280,49 +307,156 @@ async function main() {
 
   const factors = await prisma.emissionFactor.createManyAndReturn({
     data: [
+      // ── Kapsam 1 — Doğrudan Emisyonlar ─────────────────────────────────────
       {
-        name: "Turkey electricity placeholder factor",
-        country: "Turkey",
-        activityUnit: "kWh",
-        factorValue: 0.43,
-        factorUnit: "kgCO2e/kWh",
-        source: "Demo Placeholder - Must be verified for production",
-        versionYear: 2025,
-        scope: EmissionScope.SCOPE_2,
-        category: "Purchased electricity",
-      },
-      {
-        name: "Natural gas placeholder factor",
-        country: "Turkey",
-        activityUnit: "m3",
-        factorValue: 1.9,
+        name: "Natural gas — Turkey placeholder",
+        country: "Turkey", activityUnit: "m3", factorValue: 1.9,
         factorUnit: "kgCO2e/m3",
-        source: "Demo Placeholder - Must be verified for production",
-        versionYear: 2025,
-        scope: EmissionScope.SCOPE_1,
-        category: "Natural gas",
+        source: "IPCC 2006 / Demo Placeholder — verify before production",
+        versionYear: 2025, scope: EmissionScope.SCOPE_1, category: "Natural gas",
       },
       {
-        name: "Diesel placeholder factor",
-        country: "Turkey",
-        activityUnit: "L",
-        factorValue: 2.68,
+        name: "Diesel — Turkey placeholder",
+        country: "Turkey", activityUnit: "L", factorValue: 2.68,
         factorUnit: "kgCO2e/L",
-        source: "Demo Placeholder - Must be verified for production",
-        versionYear: 2025,
-        scope: EmissionScope.SCOPE_1,
-        category: "Diesel",
+        source: "DEFRA 2024 / Demo Placeholder — verify before production",
+        versionYear: 2025, scope: EmissionScope.SCOPE_1, category: "Diesel",
       },
       {
-        name: "Petrol placeholder factor",
-        country: "Turkey",
-        activityUnit: "L",
-        factorValue: 2.31,
+        name: "Petrol — Turkey placeholder",
+        country: "Turkey", activityUnit: "L", factorValue: 2.31,
         factorUnit: "kgCO2e/L",
-        source: "Demo Placeholder - Must be verified for production",
-        versionYear: 2025,
-        scope: EmissionScope.SCOPE_1,
-        category: "Petrol",
+        source: "DEFRA 2024 / Demo Placeholder — verify before production",
+        versionYear: 2025, scope: EmissionScope.SCOPE_1, category: "Petrol",
+      },
+      {
+        name: "LPG — Turkey placeholder",
+        country: "Turkey", activityUnit: "L", factorValue: 1.63,
+        factorUnit: "kgCO2e/L",
+        source: "IPCC 2006 / Demo Placeholder — verify before production",
+        versionYear: 2025, scope: EmissionScope.SCOPE_1, category: "LPG",
+      },
+      {
+        name: "Fuel oil — Turkey placeholder",
+        country: "Turkey", activityUnit: "L", factorValue: 3.17,
+        factorUnit: "kgCO2e/L",
+        source: "IPCC 2006 / Demo Placeholder — verify before production",
+        versionYear: 2025, scope: EmissionScope.SCOPE_1, category: "Fuel oil",
+      },
+      // ── Kapsam 2 — Satın Alınan Enerji ─────────────────────────────────────
+      {
+        name: "Electricity — Turkey grid placeholder",
+        country: "Turkey", activityUnit: "kWh", factorValue: 0.43,
+        factorUnit: "kgCO2e/kWh",
+        source: "TEİAŞ 2024 / Demo Placeholder — verify before production",
+        versionYear: 2025, scope: EmissionScope.SCOPE_2, category: "Purchased electricity",
+      },
+      {
+        name: "District heat/steam — Turkey placeholder",
+        country: "Turkey", activityUnit: "kWh", factorValue: 0.18,
+        factorUnit: "kgCO2e/kWh",
+        source: "IEA 2024 / Demo Placeholder — verify before production",
+        versionYear: 2025, scope: EmissionScope.SCOPE_2, category: "District heat",
+      },
+      // ── Kapsam 3 — Dolaylı Emisyonlar ──────────────────────────────────────
+      // Cat.1 — Satın Alınan Mal ve Hizmetler (harcama bazlı, USEEIO ortalama)
+      {
+        name: "S3 Cat.1 — Purchased goods & services (spend-based avg.)",
+        country: "Global", activityUnit: "kUSD", factorValue: 500,
+        factorUnit: "kgCO2e/kUSD",
+        source: "USEEIO v2 / Demo Placeholder — verify with actual supplier data",
+        versionYear: 2025, scope: EmissionScope.SCOPE_3, category: "S3_Cat1_PurchasedGoods",
+      },
+      // Cat.3 — Yakıt ve Enerji ile İlgili Faaliyetler (iletim/dağıtım kayıpları)
+      {
+        name: "S3 Cat.3 — Fuel & energy upstream losses (electricity)",
+        country: "Turkey", activityUnit: "kWh", factorValue: 0.04,
+        factorUnit: "kgCO2e/kWh",
+        source: "IEA T&D loss factor / Demo Placeholder",
+        versionYear: 2025, scope: EmissionScope.SCOPE_3, category: "S3_Cat3_FuelEnergyRelated",
+      },
+      // Cat.4 — Upstream Lojistik
+      {
+        name: "S3 Cat.4 — Upstream logistics — road freight",
+        country: "Global", activityUnit: "ton-km", factorValue: 0.062,
+        factorUnit: "kgCO2e/ton-km",
+        source: "GLEC Framework 2023 / Demo Placeholder",
+        versionYear: 2025, scope: EmissionScope.SCOPE_3, category: "S3_Cat4_UpstreamLogistics",
+      },
+      // Cat.5 — Operasyon Atığı
+      {
+        name: "S3 Cat.5 — Waste to landfill (mixed municipal)",
+        country: "Turkey", activityUnit: "kg", factorValue: 0.58,
+        factorUnit: "kgCO2e/kg",
+        source: "IPCC 2006 waste guidelines / Demo Placeholder",
+        versionYear: 2025, scope: EmissionScope.SCOPE_3, category: "S3_Cat5_WasteLandfill",
+      },
+      {
+        name: "S3 Cat.5 — Waste incinerated (mixed municipal)",
+        country: "Turkey", activityUnit: "kg", factorValue: 0.32,
+        factorUnit: "kgCO2e/kg",
+        source: "IPCC 2006 waste guidelines / Demo Placeholder",
+        versionYear: 2025, scope: EmissionScope.SCOPE_3, category: "S3_Cat5_WasteIncinerated",
+      },
+      // Cat.6 — İş Seyahati
+      {
+        name: "S3 Cat.6 — Air travel short haul (economy)",
+        country: "Global", activityUnit: "km", factorValue: 0.255,
+        factorUnit: "kgCO2e/km",
+        source: "DEFRA 2024 / Demo Placeholder",
+        versionYear: 2025, scope: EmissionScope.SCOPE_3, category: "S3_Cat6_AirShortHaul",
+      },
+      {
+        name: "S3 Cat.6 — Air travel long haul (economy)",
+        country: "Global", activityUnit: "km", factorValue: 0.195,
+        factorUnit: "kgCO2e/km",
+        source: "DEFRA 2024 / Demo Placeholder",
+        versionYear: 2025, scope: EmissionScope.SCOPE_3, category: "S3_Cat6_AirLongHaul",
+      },
+      {
+        name: "S3 Cat.6 — Rail travel",
+        country: "Turkey", activityUnit: "km", factorValue: 0.041,
+        factorUnit: "kgCO2e/km",
+        source: "IEA Rail / Demo Placeholder",
+        versionYear: 2025, scope: EmissionScope.SCOPE_3, category: "S3_Cat6_Rail",
+      },
+      {
+        name: "S3 Cat.6 — Car travel (average)",
+        country: "Turkey", activityUnit: "km", factorValue: 0.171,
+        factorUnit: "kgCO2e/km",
+        source: "DEFRA 2024 / Demo Placeholder",
+        versionYear: 2025, scope: EmissionScope.SCOPE_3, category: "S3_Cat6_Car",
+      },
+      // Cat.7 — Çalışan Ulaşımı
+      {
+        name: "S3 Cat.7 — Employee commute by car",
+        country: "Turkey", activityUnit: "km", factorValue: 0.171,
+        factorUnit: "kgCO2e/km",
+        source: "DEFRA 2024 / Demo Placeholder",
+        versionYear: 2025, scope: EmissionScope.SCOPE_3, category: "S3_Cat7_CommuteCar",
+      },
+      {
+        name: "S3 Cat.7 — Employee commute by public transit",
+        country: "Turkey", activityUnit: "km", factorValue: 0.089,
+        factorUnit: "kgCO2e/km",
+        source: "IEA Transit / Demo Placeholder",
+        versionYear: 2025, scope: EmissionScope.SCOPE_3, category: "S3_Cat7_CommuteTransit",
+      },
+      // Cat.9 — Downstream Lojistik
+      {
+        name: "S3 Cat.9 — Downstream logistics — road freight",
+        country: "Global", activityUnit: "ton-km", factorValue: 0.062,
+        factorUnit: "kgCO2e/ton-km",
+        source: "GLEC Framework 2023 / Demo Placeholder",
+        versionYear: 2025, scope: EmissionScope.SCOPE_3, category: "S3_Cat9_DownstreamLogistics",
+      },
+      // Cat.11 — Satılan Ürünlerin Kullanımı
+      {
+        name: "S3 Cat.11 — Use of sold products (electricity)",
+        country: "Turkey", activityUnit: "kWh", factorValue: 0.43,
+        factorUnit: "kgCO2e/kWh",
+        source: "TEİAŞ 2024 / Demo Placeholder",
+        versionYear: 2025, scope: EmissionScope.SCOPE_3, category: "S3_Cat11_ProductUse",
       },
     ],
   });
