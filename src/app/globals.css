@@ -14,6 +14,14 @@
 
 * {
   box-sizing: border-box;
+  /* Smoother touch scrolling on iOS */
+  -webkit-tap-highlight-color: transparent;
+}
+
+html {
+  /* Honour iPhone notch / dynamic island */
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
 }
 
 body {
@@ -21,4 +29,23 @@ body {
   background: radial-gradient(circle at top right, #e4edf5 0%, #f4f6f8 45%, #f8fafc 100%);
   color: var(--foreground);
   font-family: var(--font-sans), sans-serif;
+  /* Prevent horizontal overflow causing accidental side-scroll on mobile */
+  overflow-x: hidden;
+}
+
+/* Smooth momentum scrolling on iOS */
+main, aside, .overflow-y-auto {
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Ensure inputs/buttons have enough tap target on touch devices */
+@media (pointer: coarse) {
+  button, a, [role="button"] {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  input, select, textarea {
+    min-height: 44px;
+    font-size: 16px; /* prevents iOS zoom on focus */
+  }
 }

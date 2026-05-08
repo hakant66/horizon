@@ -24,6 +24,8 @@ export const dictionary = {
     questionnaireAnswers: "Anket Yanıtları",
     questionnaireDashboard: "Anket Panosu",
     esgSummary: "ESG Özet Bilgileri",
+    openMenu: "Menüyü Aç",
+    closeMenu: "Menüyü Kapat",
   },
   en: {
     workflow: "Workflow",
@@ -47,6 +49,8 @@ export const dictionary = {
     questionnaireAnswers: "Questionnaire Answers",
     questionnaireDashboard: "Questionnaire Dashboard",
     esgSummary: "ESG Summary",
+    openMenu: "Open menu",
+    closeMenu: "Close menu",
   },
 } as const;
 

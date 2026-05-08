@@ -374,7 +374,7 @@ export function SetupWizardClient({
                 ? "AB CSRD kapsamı: 2 kriter karşılanırsa büyük şirket sayılır (>250 çalışan, >40M€ ciro, >20M€ varlık)."
                 : "EU CSRD scope: a company qualifies as large if 2 of 3 criteria are met (>250 employees, >€40M turnover, >€20M assets)."}
             </p>
-            <div className="grid gap-3 md:grid-cols-3">
+            <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3">
               <div>
                 <Label>{tr ? "Çalışan Sayısı" : "Employee Count"}</Label>
                 <Input
@@ -451,12 +451,12 @@ export function SetupWizardClient({
               },
             ]}
           />
-          <form className="grid gap-2 md:grid-cols-4" onSubmit={(e) => { e.preventDefault(); void addFacility(new FormData(e.currentTarget)); }}>
+          <form className="grid gap-2 sm:grid-cols-2 md:grid-cols-4" onSubmit={(e) => { e.preventDefault(); void addFacility(new FormData(e.currentTarget)); }}>
             <Input name="name" placeholder={tr ? "Tesis adı" : "Facility name"} required />
             <Input name="country" placeholder={tr ? "Ülke" : "Country"} required defaultValue="Turkey" />
             <Input name="city" placeholder={tr ? "Şehir" : "City"} />
             <Input name="facilityType" placeholder={tr ? "Tip" : "Type"} required />
-            <Button type="submit">{tr ? "Tesis Ekle" : "Add Facility"}</Button>
+            <Button type="submit" className="sm:col-span-2 md:col-span-1">{tr ? "Tesis Ekle" : "Add Facility"}</Button>
           </form>
         </div>
       )}
@@ -472,14 +472,14 @@ export function SetupWizardClient({
               { key: "role", header: tr ? "Rol" : "Role", render: (row) => row.role },
             ]}
           />
-          <form className="grid gap-2 md:grid-cols-4" onSubmit={(e) => { e.preventDefault(); void addUser(new FormData(e.currentTarget)); }}>
+          <form className="grid gap-2 sm:grid-cols-2 md:grid-cols-4" onSubmit={(e) => { e.preventDefault(); void addUser(new FormData(e.currentTarget)); }}>
             <Input name="name" placeholder={tr ? "Ad soyad" : "Full name"} required />
             <Input name="email" type="email" placeholder={tr ? "E-posta" : "Email"} required />
             <select name="role" className="h-9 rounded-md border border-slate-300 px-3 text-sm">
               {Object.values(UserRole).map((role) => (<option key={role} value={role}>{role}</option>))}
             </select>
             <Input name="password" type="password" placeholder={tr ? "Parola" : "Password"} required />
-            <Button type="submit">{tr ? "Kullanıcı Davet Et" : "Invite User"}</Button>
+            <Button type="submit" className="sm:col-span-2 md:col-span-1">{tr ? "Kullanıcı Davet Et" : "Invite User"}</Button>
           </form>
         </div>
       )}
@@ -506,7 +506,7 @@ export function SetupWizardClient({
               ? "Raporlama dönemi oluşturarak kurulumu tamamlayın."
               : "Finalize setup by creating a reporting period."}
           </p>
-          <form className="grid gap-2 md:grid-cols-4" onSubmit={(e) => { e.preventDefault(); void addPeriod(new FormData(e.currentTarget)); }}>
+          <form className="grid gap-2 sm:grid-cols-2 md:grid-cols-4" onSubmit={(e) => { e.preventDefault(); void addPeriod(new FormData(e.currentTarget)); }}>
             <Input name="name" defaultValue="2026" />
             <Input type="date" name="startDate" required />
             <Input type="date" name="endDate" required />
@@ -516,7 +516,7 @@ export function SetupWizardClient({
               <option value="SUBMITTED">SUBMITTED</option>
               <option value="CERTIFIED">CERTIFIED</option>
             </select>
-            <Button type="submit">{tr ? "Dönem Oluştur" : "Create Period"}</Button>
+            <Button type="submit" className="sm:col-span-2 md:col-span-1">{tr ? "Dönem Oluştur" : "Create Period"}</Button>
           </form>
         </div>
       )}
