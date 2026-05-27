@@ -12,6 +12,7 @@ export async function GET() {
       "FINANCE_REVIEWER",
       "DATA_CONTRIBUTOR",
       "AUDITOR",
+      "HORIZON_CONSULTANT",
     ]);
     const summary = await prisma.esgSummary.findUnique({
       where: { organizationId: user.organizationId },

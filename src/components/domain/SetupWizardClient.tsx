@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { UserRole } from "@prisma/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -64,6 +64,14 @@ export function SetupWizardClient({
   const [step, setStep] = useState(1);
   const [message, setMessage] = useState("");
   const [facilityRows, setFacilityRows] = useState(facilities);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiMsg, setAiMsg] = useState("");
+  const [periods, setPeriods] = useState<Array<{ id: string; name: string; status: string }>>([]);
+
+  useEffect(() => {
+    if (step === 4) void loadPeriods();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step]);
 
   const [orgForm, setOrgForm] = useState<OrgForm>({
     name: organization.name,
@@ -128,6 +136,41 @@ export function SetupWizardClient({
     assetsEurM: orgForm.totalAssetsEurM ? Number(orgForm.totalAssetsEurM) : null,
     isPublicInterestEntity: orgForm.isPublicInterestEntity,
   });
+
+  async function fillFromAI() {
+    setAiLoading(true);
+    setAiMsg("");
+    try {
+      const res = await fetch("/api/ai/rag", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ target: "setup" }),
+      });
+      if (!res.ok) {
+        const err = (await res.json()) as { error?: string };
+        setAiMsg(err.error ?? (tr ? "AI doldurulamadı" : "AI fill failed"));
+        return;
+      }
+      const data = (await res.json()) as { fields: Record<string, unknown> };
+      const f = data.fields;
+      setOrgForm((prev) => ({
+        ...prev,
+        ...(typeof f.name === "string" ? { name: f.name } : {}),
+        ...(typeof f.taxId === "string" ? { taxId: f.taxId } : {}),
+        ...(typeof f.sector === "string" ? { sector: f.sector } : {}),
+        ...(typeof f.naceCode === "string" ? { naceCode: f.naceCode } : {}),
+        ...(typeof f.naceDescription === "string" ? { naceDescription: f.naceDescription } : {}),
+        ...(typeof f.employeeCount === "number" ? { employeeCount: String(f.employeeCount) } : {}),
+        ...(typeof f.headquartersCountry === "string" ? { headquartersCountry: f.headquartersCountry } : {}),
+        ...(typeof f.reportingCurrency === "string" ? { reportingCurrency: f.reportingCurrency } : {}),
+      }));
+      setAiMsg(tr ? "Alanlar AI ile dolduruldu. Lütfen kontrol edip kaydedin." : "Fields filled by AI. Please review and save.");
+    } catch {
+      setAiMsg(tr ? "AI servisine ulaşılamadı" : "Could not reach AI service");
+    } finally {
+      setAiLoading(false);
+    }
+  }
 
   async function saveOrg() {
     const res = await fetch("/api/organization", {
@@ -209,6 +252,27 @@ export function SetupWizardClient({
     const payload = Object.fromEntries(formData.entries());
     const res = await fetch("/api/reporting-periods", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
     setMessage(res.ok ? (tr ? "Raporlama dönemi oluşturuldu" : "Reporting period created") : tr ? "Raporlama dönemi oluşturulamadı" : "Reporting period creation failed");
+    if (res.ok) void loadPeriods();
+  }
+
+  async function loadPeriods() {
+    const res = await fetch("/api/reporting-periods");
+    if (res.ok) {
+      const data = await res.json() as Array<{ id: string; name: string; status: string }>;
+      setPeriods(data);
+    }
+  }
+
+  async function lockPeriod(id: string) {
+    const res = await fetch(`/api/reporting-periods/${id}/lock`, { method: "POST" });
+    setMessage(res.ok ? (tr ? "Dönem kilitlendi" : "Period locked") : tr ? "Kilitleme başarısız" : "Lock failed");
+    if (res.ok) void loadPeriods();
+  }
+
+  async function unlockPeriod(id: string) {
+    const res = await fetch(`/api/reporting-periods/${id}/unlock`, { method: "POST" });
+    setMessage(res.ok ? (tr ? "Dönem açıldı" : "Period unlocked") : tr ? "Açma başarısız" : "Unlock failed");
+    if (res.ok) void loadPeriods();
   }
 
   const csrdBadgeColor =
@@ -226,7 +290,7 @@ export function SetupWizardClient({
   return (
     <div className="space-y-4">
       <Stepper
-        steps={tr ? ["Şirket & Sektör", "Tesisler", "Roller", "Gözden Geçirme"] : ["Company & Sector", "Facilities", "Roles", "Review"]}
+        steps={tr ? ["Şirket & Sektör", "Tesisler", "Roller", "Gözden Geçirme", "Tamamlandı"] : ["Company & Sector", "Facilities", "Roles", "Review", "Complete"]}
         currentStep={step}
       />
       {message ? <p className="text-sm text-slate-600">{message}</p> : null}
@@ -424,9 +488,15 @@ export function SetupWizardClient({
             </div>
           </div>
 
-          <Button type="button" onClick={saveOrg}>
-            {tr ? "Şirket Bilgilerini Kaydet" : "Save Company Info"}
-          </Button>
+          <div className="flex items-center gap-3 flex-wrap">
+            <Button type="button" onClick={saveOrg}>
+              {tr ? "Şirket Bilgilerini Kaydet" : "Save Company Info"}
+            </Button>
+            <Button type="button" variant="outline" onClick={() => void fillFromAI()} disabled={aiLoading}>
+              {aiLoading ? (tr ? "Yükleniyor..." : "Loading...") : (tr ? "AI ile Doldur" : "Fill with AI")}
+            </Button>
+            {aiMsg && <p className="text-xs text-slate-600">{aiMsg}</p>}
+          </div>
         </div>
       )}
 
@@ -506,27 +576,198 @@ export function SetupWizardClient({
               ? "Raporlama dönemi oluşturarak kurulumu tamamlayın."
               : "Finalize setup by creating a reporting period."}
           </p>
+
+          {/* Period status legend */}
+          <div className="rounded-md border border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-600 space-y-1">
+            <p className="font-semibold text-slate-700 mb-1.5">{tr ? "Dönem Durumları" : "Period Statuses"}</p>
+            <div className="grid gap-1 sm:grid-cols-2">
+              <span><span className="inline-block rounded-full bg-green-100 px-2 py-0.5 text-[11px] font-semibold text-green-700 mr-1">OPEN</span>{tr ? "Veri girilebilir, düzenlenebilir" : "Data entry allowed, editable"}</span>
+              <span><span className="inline-block rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-700 mr-1">LOCKED</span>{tr ? "Veri girişi dondurulmuş, belgelendirme başlatılabilir" : "Data entry frozen, certification can begin"}</span>
+              <span><span className="inline-block rounded-full bg-blue-100 px-2 py-0.5 text-[11px] font-semibold text-blue-700 mr-1">SUBMITTED</span>{tr ? "Denetçiye gönderilmiş" : "Submitted to auditor"}</span>
+              <span><span className="inline-block rounded-full bg-slate-200 px-2 py-0.5 text-[11px] font-semibold text-slate-600 mr-1">CERTIFIED</span>{tr ? "Onaylanmış, kapatılmış" : "Approved and closed"}</span>
+            </div>
+          </div>
+
           <form className="grid gap-2 sm:grid-cols-2 md:grid-cols-4" onSubmit={(e) => { e.preventDefault(); void addPeriod(new FormData(e.currentTarget)); }}>
             <Input name="name" defaultValue="2026" />
             <Input type="date" name="startDate" required />
             <Input type="date" name="endDate" required />
             <select name="status" className="h-9 rounded-md border border-slate-300 px-3 text-sm">
-              <option value="OPEN">OPEN</option>
-              <option value="LOCKED">LOCKED</option>
-              <option value="SUBMITTED">SUBMITTED</option>
-              <option value="CERTIFIED">CERTIFIED</option>
+              <option value="OPEN">{tr ? "OPEN — Açık" : "OPEN — Active"}</option>
+              <option value="LOCKED">{tr ? "LOCKED — Kilitli" : "LOCKED — Frozen"}</option>
+              <option value="SUBMITTED">{tr ? "SUBMITTED — Gönderildi" : "SUBMITTED — Sent"}</option>
+              <option value="CERTIFIED">{tr ? "CERTIFIED — Belgelendi" : "CERTIFIED — Certified"}</option>
             </select>
             <Button type="submit" className="sm:col-span-2 md:col-span-1">{tr ? "Dönem Oluştur" : "Create Period"}</Button>
           </form>
+
+          {periods.length > 0 && (
+            <div className="space-y-2">
+              <p className="text-sm font-medium text-slate-700">{tr ? "Mevcut Dönemler" : "Existing Periods"}</p>
+              {periods.map((p) => (
+                <div key={p.id} className="flex items-center justify-between rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm">
+                  <span className="font-medium text-slate-800">{p.name}</span>
+                  <div className="flex items-center gap-2">
+                    <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+                      p.status === "OPEN" ? "bg-green-100 text-green-700" :
+                      p.status === "LOCKED" ? "bg-amber-100 text-amber-700" :
+                      p.status === "SUBMITTED" ? "bg-blue-100 text-blue-700" :
+                      "bg-slate-200 text-slate-600"
+                    }`}>
+                      {tr
+                        ? p.status === "OPEN" ? "Açık"
+                        : p.status === "LOCKED" ? "Kilitli"
+                        : p.status === "SUBMITTED" ? "Gönderildi"
+                        : "Belgelendi"
+                        : p.status}
+                    </span>
+                    {p.status === "OPEN" && (
+                      <Button size="sm" variant="outline" className="h-6 px-2 text-xs" onClick={() => void lockPeriod(p.id)}>
+                        {tr ? "Kilitle" : "Lock"}
+                      </Button>
+                    )}
+                    {(p.status === "LOCKED" || p.status === "SUBMITTED") && (
+                      <Button size="sm" variant="outline" className="h-6 px-2 text-xs" onClick={() => void unlockPeriod(p.id)}>
+                        {tr ? "Aç" : "Unlock"}
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Step 5: Complete ── */}
+      {step === 5 && (
+        <div className="rounded-lg border border-green-200 bg-white p-8 text-center space-y-6">
+          <div className="flex justify-center">
+            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-green-100">
+              <svg className="h-8 w-8 text-green-600" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+              </svg>
+            </div>
+          </div>
+
+          <div className="space-y-1">
+            <h2 className="text-xl font-bold text-slate-800">
+              {tr ? "Kurulum tamamlandı!" : "Setup complete!"}
+            </h2>
+            <p className="text-sm text-slate-500">
+              {tr
+                ? "Platformunuz kullanıma hazır. Aşağıdaki adımlarla sürdürülebilirlik raporlamasına başlayabilirsiniz."
+                : "Your platform is ready. You can start sustainability reporting with the steps below."}
+            </p>
+          </div>
+
+          {/* Summary chips */}
+          <div className="flex flex-wrap justify-center gap-2">
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-600">
+              <span className="h-1.5 w-1.5 rounded-full bg-green-500 inline-block" />
+              {orgForm.name || (tr ? "Şirket" : "Company")}
+            </span>
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-600">
+              <span className="h-1.5 w-1.5 rounded-full bg-green-500 inline-block" />
+              {facilityRows.length} {tr ? "tesis" : "facilit" + (facilityRows.length === 1 ? "y" : "ies")}
+            </span>
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-600">
+              <span className="h-1.5 w-1.5 rounded-full bg-green-500 inline-block" />
+              {users.length} {tr ? "kullanıcı" : "user" + (users.length === 1 ? "" : "s")}
+            </span>
+            {periods.length > 0 && (
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-600">
+                <span className="h-1.5 w-1.5 rounded-full bg-green-500 inline-block" />
+                {periods.length} {tr ? "raporlama dönemi" : "reporting period" + (periods.length === 1 ? "" : "s")}
+              </span>
+            )}
+          </div>
+
+          {/* Next steps */}
+          <div className="text-left space-y-2">
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-400 text-center">
+              {tr ? "Önerilen sonraki adımlar" : "Recommended next steps"}
+            </p>
+            <div className="grid gap-2 sm:grid-cols-2">
+              {[
+                {
+                  href: "/esg-summary",
+                  icon: (
+                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z" />
+                    </svg>
+                  ),
+                  title: tr ? "ESG Özet Bilgileri" : "ESG Summary",
+                  desc: tr ? "Temel ESG metriklerini ve şirket verilerini girin." : "Enter key ESG metrics and company data.",
+                },
+                {
+                  href: "/materiality",
+                  icon: (
+                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.955 11.955 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" />
+                    </svg>
+                  ),
+                  title: tr ? "Önemlilik Değerlendirmesi" : "Materiality Assessment",
+                  desc: tr ? "Paydaş ve çevre önem sıralamasını belirleyin." : "Prioritize stakeholder and environmental topics.",
+                },
+                {
+                  href: "/knowledge-base",
+                  icon: (
+                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25" />
+                    </svg>
+                  ),
+                  title: tr ? "Bilgi Bankası" : "Knowledge Base",
+                  desc: tr ? "Belge yükleyin ve AI ile veri doldurmayı etkinleştirin." : "Upload documents and enable AI-assisted data entry.",
+                },
+                {
+                  href: "/reports",
+                  icon: (
+                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+                    </svg>
+                  ),
+                  title: tr ? "Raporlar" : "Reports",
+                  desc: tr ? "Sürdürülebilirlik raporlarınızı oluşturun ve yönetin." : "Generate and manage sustainability reports.",
+                },
+              ].map((item) => (
+                <a
+                  key={item.href}
+                  href={item.href}
+                  className="flex items-start gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3 text-left transition-colors hover:border-slate-300 hover:bg-white"
+                >
+                  <span className="mt-0.5 flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-md bg-white border border-slate-200 text-slate-600">
+                    {item.icon}
+                  </span>
+                  <div>
+                    <p className="text-sm font-medium text-slate-800">{item.title}</p>
+                    <p className="text-xs text-slate-500">{item.desc}</p>
+                  </div>
+                </a>
+              ))}
+            </div>
+          </div>
+
+          <div className="pt-2">
+            <a
+              href="/dashboard"
+              className="inline-flex items-center gap-2 rounded-md bg-slate-900 px-5 py-2.5 text-sm font-medium text-white hover:bg-slate-700 transition-colors"
+            >
+              {tr ? "Ana Sayfaya Git" : "Go to Dashboard"}
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+              </svg>
+            </a>
+          </div>
         </div>
       )}
 
       <div className="flex justify-between">
-        <Button variant="outline" disabled={step === 1} onClick={() => setStep((s) => Math.max(1, s - 1))}>
+        <Button variant="outline" disabled={step === 1 || step === 5} onClick={() => setStep((s) => Math.max(1, s - 1))}>
           {tr ? "Geri" : "Back"}
         </Button>
-        <Button onClick={() => setStep((s) => Math.min(4, s + 1))}>
-          {tr ? "İleri" : "Next"}
+        <Button onClick={() => setStep((s) => Math.min(5, s + 1))} disabled={step === 5}>
+          {tr ? (step === 4 ? "Tamamla" : "İleri") : (step === 4 ? "Finish" : "Next")}
         </Button>
       </div>
     </div>

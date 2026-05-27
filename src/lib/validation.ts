@@ -1,11 +1,18 @@
 import { z } from "zod";
 import {
+  ApprovalStage,
   ClimateRiskType,
+  ConsolidationMethod,
   MetricEntryStatus,
+  NotificationType,
   ReportFramework,
   CertificationStatus,
   EvidenceStatus,
   QuestionnaireType,
+  RiskOrOpportunity,
+  Scope2Method,
+  TaskPriority,
+  TaskStatus,
   UserRole,
 } from "@prisma/client";
 
@@ -24,6 +31,45 @@ export const orgSchema = z.object({
   isPublicInterestEntity: z.boolean().optional().nullable(),
   headquartersCountry: z.string().min(2),
   reportingCurrency: z.string().length(3),
+  consolidationMethod: z.nativeEnum(ConsolidationMethod).optional().nullable(),
+});
+
+export const subsidiarySchema = z.object({
+  id: z.string().optional(),
+  name: z.string().min(2),
+  country: z.string().min(2),
+  ownershipPercent: z.coerce.number().min(0).max(100),
+  isInScope: z.boolean().default(true),
+  consolidationNote: z.string().optional().nullable(),
+});
+
+export const businessUnitSchema = z.object({
+  id: z.string().optional(),
+  name: z.string().min(2),
+  parentId: z.string().optional().nullable(),
+});
+
+export const sectorDefinitionSchema = z.object({
+  id: z.string().optional(),
+  code: z.string().min(2).max(20),
+  name_tr: z.string().min(2),
+  name_en: z.string().min(2),
+  parentId: z.string().optional().nullable(),
+  isActive: z.boolean().default(true),
+  metricCodes: z.array(z.string()).default([]),
+});
+
+export const taskSchema = z.object({
+  id: z.string().optional(),
+  reportingPeriodId: z.string().optional().nullable(),
+  assignedToId: z.string(),
+  title: z.string().min(2),
+  description: z.string().optional().nullable(),
+  entityType: z.string().optional().nullable(),
+  entityId: z.string().optional().nullable(),
+  dueDate: z.string().optional().nullable(),
+  priority: z.nativeEnum(TaskPriority).default("MEDIUM"),
+  status: z.nativeEnum(TaskStatus).optional(),
 });
 
 export const facilitySchema = z.object({
@@ -57,8 +103,15 @@ export const metricEntrySchema = z.object({
   value: z.coerce.number().nullable().optional(),
   unit: z.string().min(1),
   status: z.nativeEnum(MetricEntryStatus).optional(),
+  approvalStage: z.nativeEnum(ApprovalStage).optional(),
   ownerUserId: z.string().nullable().optional(),
   notes: z.string().nullable().optional(),
+});
+
+export const approvalStageTransitionSchema = z.object({
+  id: z.string(),
+  approvalStage: z.nativeEnum(ApprovalStage),
+  comment: z.string().optional().nullable(),
 });
 
 export const materialitySchema = z.object({
@@ -91,12 +144,14 @@ export const emissionRecalcSchema = z.object({
   emissionFactorId: z.string().optional(),
   overrideFactorValue: z.coerce.number().optional(),
   overrideReason: z.string().optional(),
+  scope2Method: z.nativeEnum(Scope2Method).optional(),
 });
 
 export const climateRiskSchema = z.object({
   id: z.string().optional(),
   reportingPeriodId: z.string(),
   facilityId: z.string().nullable().optional(),
+  entryType: z.nativeEnum(RiskOrOpportunity).optional().default("RISK"),
   name: z.string().min(2),
   type: z.nativeEnum(ClimateRiskType),
   probability: z.enum(["High", "Medium", "Low"]),
@@ -214,6 +269,13 @@ export const questionnaireQuestionSchema = z.object({
   example: z.string().optional().nullable(),
   reminder: z.string().optional().nullable(),
   video_link: z.string().url().optional().nullable(),
+  standardCode: z.string().optional().nullable(),
+  evidenceType: z.string().optional().nullable(),
+  isMandatory: z.boolean().optional().default(false),
+  acceptanceCriteria: z.string().optional().nullable(),
+  errorWarning: z.string().optional().nullable(),
+  minValue: z.coerce.number().optional().nullable(),
+  maxValue: z.coerce.number().optional().nullable(),
 });
 
 export const questionnaireAnswerSchema = z.object({
@@ -223,7 +285,27 @@ export const questionnaireAnswerSchema = z.object({
   reportingPeriodId: z.string(),
   answer_text: z.string().optional().nullable(),
   answer_number: z.coerce.number().optional().nullable(),
+  approvalStage: z.nativeEnum(ApprovalStage).optional(),
 });
+
+export const bulkRevisionSchema = z.object({
+  entityType: z.enum(["METRIC_ENTRY", "QUESTIONNAIRE_ANSWER"]),
+  entityIds: z.array(z.string()).min(1, "At least one entity ID is required"),
+  comment: z.string().min(2),
+  dueDate: z.string().optional().nullable(),
+  reportingPeriodId: z.string().optional().nullable(),
+});
+
+export const notificationReadSchema = z.object({
+  isRead: z.boolean(),
+});
+
+export const reportApprovalSchema = z.object({
+  notes: z.string().optional().nullable(),
+});
+
+// Re-export for convenience
+export { NotificationType };
 
 export const esgSummarySchema = z.object({
   legalName: z.string().optional().nullable(),

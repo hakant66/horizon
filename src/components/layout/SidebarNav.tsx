@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import {
   LayoutDashboard, Settings2, ClipboardList, MessageSquare, Target,
   Database, Wind, AlertTriangle, TrendingUp, FileText, Award,
-  History, SlidersHorizontal,
+  History, SlidersHorizontal, BookOpen,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { NAV_ITEMS } from "@/lib/constants";
@@ -27,13 +27,9 @@ const ICONS: Record<NavIconName, LucideIcon> = {
   Award,
   History,
   SlidersHorizontal,
+  BookOpen,
 };
 
-/**
- * Props:
- * - collapsed: tablet mode — show only icons
- * - onNavigate: called after a link click (to close mobile drawer)
- */
 export function SidebarNav({
   collapsed = false,
   onNavigate,
@@ -47,30 +43,34 @@ export function SidebarNav({
   return (
     <aside
       className={cn(
-        "flex h-full flex-col border-r border-slate-200 bg-white transition-all duration-200",
+        "flex h-full flex-col border-r border-slate-100 bg-slate-950 transition-all duration-200",
         collapsed ? "w-14" : "w-64",
       )}
     >
-      {/* Logo / Brand */}
-      <div className={cn(
-        "flex items-center gap-2 border-b border-slate-100 px-3 py-4",
-        collapsed ? "justify-center" : "",
-      )}>
-        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-slate-900 text-xs font-bold text-white">
+      {/* Brand */}
+      <div
+        className={cn(
+          "flex items-center border-b border-slate-800 px-4 py-5",
+          collapsed ? "justify-center px-0" : "",
+        )}
+      >
+        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white text-xs font-black tracking-tight text-slate-950">
           H
-        </span>
+        </div>
         {!collapsed && (
-          <span className="text-sm font-semibold text-slate-800 leading-tight">
-            Horizon<br />
-            <span className="text-xs font-normal text-slate-400">Sustainability</span>
-          </span>
+          <div className="ml-3 min-w-0">
+            <p className="text-sm font-semibold leading-none text-white">Horizon</p>
+            <p className="mt-0.5 text-[10px] font-medium uppercase tracking-widest text-slate-500">
+              Sustainability
+            </p>
+          </div>
         )}
       </div>
 
-      {/* Nav items */}
-      <nav className="flex-1 overflow-y-auto py-2 px-2 space-y-0.5">
+      {/* Nav */}
+      <nav className="flex-1 overflow-y-auto py-3 px-2 space-y-0.5" aria-label="Main navigation">
         {!collapsed && (
-          <p className="px-2 pb-2 pt-1 text-[10px] font-semibold uppercase tracking-widest text-slate-400">
+          <p className="mb-1 px-3 text-[9px] font-bold uppercase tracking-[0.15em] text-slate-600">
             {t("workflow")}
           </p>
         )}
@@ -83,20 +83,36 @@ export function SidebarNav({
               href={item.href}
               onClick={onNavigate}
               title={collapsed ? t(item.labelKey) : undefined}
+              aria-current={active ? "page" : undefined}
               className={cn(
-                "flex items-center gap-3 rounded-md py-2 text-sm transition-colors",
+                "flex items-center gap-3 rounded-lg py-2 text-sm font-medium transition-colors",
                 collapsed ? "justify-center px-2" : "px-3",
                 active
-                  ? "bg-slate-900 text-white"
-                  : "text-slate-600 hover:bg-slate-100 hover:text-slate-900",
+                  ? "bg-white/10 text-white"
+                  : "text-slate-400 hover:bg-white/5 hover:text-white",
               )}
             >
-              <Icon className={cn("shrink-0", collapsed ? "h-5 w-5" : "h-4 w-4")} />
+              <Icon
+                className={cn(
+                  "shrink-0 transition-colors",
+                  collapsed ? "h-5 w-5" : "h-4 w-4",
+                  active ? "text-white" : "text-slate-500",
+                )}
+              />
               {!collapsed && <span className="truncate">{t(item.labelKey)}</span>}
             </Link>
           );
         })}
       </nav>
+
+      {/* Footer */}
+      {!collapsed && (
+        <div className="border-t border-slate-800 px-4 py-3">
+          <p className="text-[9px] font-medium uppercase tracking-widest text-slate-700">
+            © Horizon Platform
+          </p>
+        </div>
+      )}
     </aside>
   );
 }

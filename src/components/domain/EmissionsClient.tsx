@@ -192,9 +192,11 @@ function ScopeTable({ calcs, locale, onSelect }: { calcs: Calc[]; locale: string
 }
 
 export function EmissionsClient({
+  reportingPeriodId,
   calculations,
   metricsForRecalc,
 }: {
+  reportingPeriodId: string;
   calculations: Calc[];
   metricsForRecalc: MetricSeed[];
 }) {
@@ -205,6 +207,7 @@ export function EmissionsClient({
   const [selected, setSelected] = useState<Calc | null>(null);
   const [metricId, setMetricId] = useState(metricsForRecalc[0]?.id || "");
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
+  const [calculating, setCalculating] = useState(false);
 
   const scope1Calcs = calculations.filter((c) => c.emissionFactor.scope === "SCOPE_1");
   const scope2Calcs = calculations.filter((c) => c.emissionFactor.scope === "SCOPE_2");
@@ -221,17 +224,23 @@ export function EmissionsClient({
   const scope3Metrics = metricsForRecalc.filter((m) => SCOPE3_CODES.has(m.metricDefinition.code));
 
   async function recalculate() {
-    if (!metricId) return;
-    const res = await fetch("/api/emissions/recalculate", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ metricEntryId: metricId }),
-    });
-    if (res.ok) {
-      setMessage({ ok: true, text: tr ? "Yeniden hesaplama tamamlandı. Güncel sonuçlar için sayfayı yenileyin." : "Recalculation completed. Refresh for latest results." });
-    } else {
-      const err = await res.json().catch(() => ({})) as { error?: string };
-      setMessage({ ok: false, text: err.error ?? (tr ? "Hesaplama başarısız." : "Calculation failed.") });
+    if (!metricId || calculating) return;
+    setCalculating(true);
+    setMessage(null);
+    try {
+      const res = await fetch("/api/emissions/recalculate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ metricEntryId: metricId }),
+      });
+      if (res.ok) {
+        setMessage({ ok: true, text: tr ? "Yeniden hesaplama tamamlandı. Güncel sonuçlar için sayfayı yenileyin." : "Recalculation completed. Refresh for latest results." });
+      } else {
+        const err = await res.json().catch(() => ({})) as { error?: string };
+        setMessage({ ok: false, text: err.error ?? (tr ? "Hesaplama başarısız." : "Calculation failed.") });
+      }
+    } finally {
+      setCalculating(false);
     }
   }
 
@@ -300,11 +309,27 @@ export function EmissionsClient({
                 </optgroup>
               )}
             </select>
-            <Button onClick={recalculate}>{tr ? "Hesapla" : "Calculate"}</Button>
+            <Button onClick={recalculate} disabled={calculating || !metricId}>
+              {calculating ? (tr ? "Hesaplanıyor…" : "Calculating…") : (tr ? "Hesapla" : "Calculate")}
+            </Button>
           </div>
           {message && (
             <p className={`text-sm ${message.ok ? "text-green-700" : "text-red-700"}`}>{message.text}</p>
           )}
+          <div className="pt-1">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                const a = document.createElement("a");
+                a.href = `/api/export/emissions?reportingPeriodId=${reportingPeriodId}`;
+                a.download = "emissions.csv";
+                a.click();
+              }}
+            >
+              {tr ? "CSV İndir" : "Export CSV"}
+            </Button>
+          </div>
         </CardContent>
       </Card>
 

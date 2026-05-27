@@ -38,6 +38,7 @@ export async function PUT(request: Request) {
         isPublicInterestEntity: body.isPublicInterestEntity,
         headquartersCountry: body.headquartersCountry,
         reportingCurrency: body.reportingCurrency,
+        consolidationMethod: body.consolidationMethod ?? null,
       },
     });
 

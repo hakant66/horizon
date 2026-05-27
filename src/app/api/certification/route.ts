@@ -7,7 +7,7 @@ import { createAuditLog } from "@/lib/audit";
 
 export async function GET(request: Request) {
   try {
-    const user = await requireRole(["ADMIN", "SUSTAINABILITY_MANAGER", "FINANCE_REVIEWER", "AUDITOR"]);
+    const user = await requireRole(["ADMIN", "SUSTAINABILITY_MANAGER", "FINANCE_REVIEWER", "AUDITOR", "HORIZON_CONSULTANT"]);
     const { searchParams } = new URL(request.url);
     const reportingPeriodId = searchParams.get("reportingPeriodId") || undefined;
 

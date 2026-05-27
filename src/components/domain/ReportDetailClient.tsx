@@ -1,9 +1,46 @@
 "use client";
 
 import { useState } from "react";
+import { Sparkles, Save, FileDown, Send, CheckCircle2, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { StatusBadge } from "@/components/domain/StatusBadge";
 import { useI18n } from "@/components/providers/LanguageProvider";
+
+type Section = "governance" | "strategy" | "riskManagement" | "metricsTargets";
+
+const FORM_INIT = { governanceText: "", strategyText: "", riskManagementText: "", metricsTargetsText: "" };
+
+const SECTIONS: Array<{ key: Section; labelEn: string; labelTr: string; descEn: string; descTr: string; formKey: keyof typeof FORM_INIT }> = [
+  {
+    key: "governance",
+    labelEn: "Governance", labelTr: "Yönetişim",
+    descEn: "Board oversight, accountability, and sustainability governance structures.",
+    descTr: "Yönetim kurulu denetimi, hesap verebilirlik ve sürdürülebilirlik yönetişim yapıları.",
+    formKey: "governanceText",
+  },
+  {
+    key: "strategy",
+    labelEn: "Strategy", labelTr: "Strateji",
+    descEn: "Climate-related risks and opportunities and their impact on strategy.",
+    descTr: "İklimle ilgili riskler ve fırsatlar ile bunların strateji üzerindeki etkisi.",
+    formKey: "strategyText",
+  },
+  {
+    key: "riskManagement",
+    labelEn: "Risk Management", labelTr: "Risk Yönetimi",
+    descEn: "Processes for identifying, assessing, and managing climate-related risks.",
+    descTr: "İklimle ilgili risklerin tanımlanması, değerlendirilmesi ve yönetilmesi süreçleri.",
+    formKey: "riskManagementText",
+  },
+  {
+    key: "metricsTargets",
+    labelEn: "Metrics & Targets", labelTr: "Metrikler ve Hedefler",
+    descEn: "Metrics used to assess and manage climate risks, including GHG emissions and targets.",
+    descTr: "Sera gazı emisyonları ve hedefler dahil iklim risklerini değerlendirmek için kullanılan metrikler.",
+    formKey: "metricsTargetsText",
+  },
+];
 
 export function ReportDetailClient({
   report,
@@ -21,38 +58,65 @@ export function ReportDetailClient({
   reportingPeriodId: string;
 }) {
   const { locale } = useI18n();
-  const [message, setMessage] = useState("");
+  const tr = locale === "tr";
+
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
+  const [generatingSection, setGeneratingSection] = useState<Section | null>(null);
   const [form, setForm] = useState({
-    governanceText: report.governanceText || "",
-    strategyText: report.strategyText || "",
-    riskManagementText: report.riskManagementText || "",
-    metricsTargetsText: report.metricsTargetsText || "",
+    governanceText: report.governanceText ?? "",
+    strategyText: report.strategyText ?? "",
+    riskManagementText: report.riskManagementText ?? "",
+    metricsTargetsText: report.metricsTargetsText ?? "",
   });
 
+  function msg(ok: boolean, text: string) { setMessage({ ok, text }); }
+
   async function save() {
+    setSaving(true);
     const res = await fetch("/api/reports", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id: report.id, ...form }),
     });
-    setMessage(res.ok ? (locale === "tr" ? "Rapor kaydedildi" : "Report saved") : locale === "tr" ? "Rapor kaydı başarısız" : "Report save failed");
+    setSaving(false);
+    msg(res.ok, res.ok ? (tr ? "Kaydedildi" : "Saved") : (tr ? "Kayıt başarısız" : "Save failed"));
   }
 
   async function generateDraft() {
+    msg(true, tr ? "Taslak oluşturuluyor…" : "Generating draft…");
     const res = await fetch("/api/reports/generate", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ reportId: report.id }),
     });
-    setMessage(
-      res.ok
-        ? locale === "tr"
-          ? "Taslak oluşturuldu"
-          : "Draft generated"
-        : locale === "tr"
-          ? "Taslak oluşturma başarısız"
-          : "Draft generation failed",
-    );
+    msg(res.ok, res.ok ? (tr ? "Taslak oluşturuldu" : "Draft generated") : (tr ? "Başarısız" : "Failed"));
+  }
+
+  async function generateAiNarrative(section: Section) {
+    setGeneratingSection(section);
+    const res = await fetch(`/api/reports/${report.id}/ai-narrative`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sections: [section], locale }),
+    });
+    setGeneratingSection(null);
+    if (!res.ok) { msg(false, tr ? "YZ oluşturma başarısız" : "AI generation failed"); return; }
+    const data = await res.json().catch(() => ({})) as Record<string, string>;
+    if (data[section]) {
+      const textKey = `${section}Text` as keyof typeof form;
+      setForm((p) => ({ ...p, [textKey]: data[section] }));
+      msg(true, tr ? `"${section}" bölümü YZ tarafından oluşturuldu` : `"${section}" section generated by AI`);
+    }
+  }
+
+  async function approveReport() {
+    const res = await fetch(`/api/reports/${report.id}/approve`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ notes: "" }),
+    });
+    msg(res.ok, res.ok ? (tr ? "Rapor onaylandı" : "Report approved") : (tr ? "Onay başarısız" : "Approval failed"));
   }
 
   async function submitForCertification() {
@@ -61,36 +125,36 @@ export function ReportDetailClient({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ reportId: report.id, reportingPeriodId, status: "DRAFT" }),
     });
-    if (!create.ok) {
-      setMessage(locale === "tr" ? "Belgelendirme başvurusu oluşturulamadı" : "Failed to create certification submission");
-      return;
-    }
+    if (!create.ok) { msg(false, tr ? "Başvuru oluşturulamadı" : "Failed to create submission"); return; }
     const submission = (await create.json()) as { id: string };
     const submit = await fetch("/api/certification/submit", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ submissionId: submission.id }),
     });
-    setMessage(
-      submit.ok
-        ? locale === "tr"
-          ? "Belgelendirme için gönderildi"
-          : "Submitted for certification"
-        : locale === "tr"
-          ? "Gönderim başarısız"
-          : "Submission failed",
-    );
+    msg(submit.ok, submit.ok ? (tr ? "Belgelendirmeye gönderildi" : "Submitted for certification") : (tr ? "Gönderim başarısız" : "Submission failed"));
   }
 
   async function exportHtml() {
-    const t = {
-      report: locale === "tr" ? "Rapor" : "Report",
-      governance: locale === "tr" ? "Yönetişim" : "Governance",
-      strategy: locale === "tr" ? "Strateji" : "Strategy",
-      risk: locale === "tr" ? "Risk yönetimi" : "Risk management",
-      metrics: locale === "tr" ? "Metrikler ve hedefler" : "Metrics and targets",
+    const labels = {
+      report: tr ? "Rapor" : "Report",
+      governance: tr ? "Yönetişim" : "Governance",
+      strategy: tr ? "Strateji" : "Strategy",
+      risk: tr ? "Risk Yönetimi" : "Risk Management",
+      metrics: tr ? "Metrikler ve Hedefler" : "Metrics & Targets",
     };
-    const html = `<!doctype html><html><head><meta charset="utf-8"/><title>${report.framework} ${t.report}</title></head><body><h1>${report.framework}</h1><h2>${t.governance}</h2><p>${form.governanceText}</p><h2>${t.strategy}</h2><p>${form.strategyText}</p><h2>${t.risk}</h2><p>${form.riskManagementText}</p><h2>${t.metrics}</h2><p>${form.metricsTargetsText}</p></body></html>`;
+    const html = [
+      `<!doctype html><html><head><meta charset="utf-8"/>`,
+      `<title>${report.framework} ${labels.report}</title>`,
+      `<style>body{font-family:Georgia,serif;max-width:800px;margin:40px auto;color:#1e293b;line-height:1.6}h1{font-size:1.5rem;font-weight:700;border-bottom:2px solid #e2e8f0;padding-bottom:8px}h2{font-size:1rem;font-weight:600;margin-top:2rem;color:#475569}p{white-space:pre-wrap}</style>`,
+      `</head><body>`,
+      `<h1>${report.framework.replace(/_/g, " ")} ${labels.report}</h1>`,
+      `<h2>${labels.governance}</h2><p>${form.governanceText || "—"}</p>`,
+      `<h2>${labels.strategy}</h2><p>${form.strategyText || "—"}</p>`,
+      `<h2>${labels.risk}</h2><p>${form.riskManagementText || "—"}</p>`,
+      `<h2>${labels.metrics}</h2><p>${form.metricsTargetsText || "—"}</p>`,
+      `</body></html>`,
+    ].join("");
     const blob = new Blob([html], { type: "text/html" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -101,41 +165,82 @@ export function ReportDetailClient({
   }
 
   return (
-    <div className="space-y-4">
-      {message ? <p className="text-sm text-slate-600">{message}</p> : null}
-      <p className="text-xs text-amber-700">
-        {locale === "tr"
-          ? "Bu platform yapılandırılmış sürdürülebilirlik raporlama desteği sunar. Nihai mevzuat uyumu ve belgelendirme kararları yetkin profesyonellerin incelemesini gerektirir."
+    <div className="space-y-6">
+      {/* Status bar */}
+      <div className="flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+        <span className="text-xs font-semibold uppercase tracking-widest text-slate-500">{tr ? "Durum" : "Status"}</span>
+        <StatusBadge status={report.status} />
+        {message && (
+          <span className={`ml-auto text-xs font-medium ${message.ok ? "text-emerald-700" : "text-red-700"}`}>
+            {message.text}
+          </span>
+        )}
+      </div>
+
+      {/* Sections */}
+      <div className="space-y-4">
+        {SECTIONS.map((s) => (
+          <div key={s.key} className="rounded-xl border border-slate-200 bg-white overflow-hidden">
+            <div className="flex items-start justify-between gap-3 border-b border-slate-100 bg-slate-50/60 px-4 py-3">
+              <div>
+                <p className="text-sm font-semibold text-slate-800">{tr ? s.labelTr : s.labelEn}</p>
+                <p className="mt-0.5 text-xs text-slate-500">{tr ? s.descTr : s.descEn}</p>
+              </div>
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={generatingSection === s.key}
+                onClick={() => void generateAiNarrative(s.key)}
+                className="shrink-0"
+              >
+                {generatingSection === s.key ? (
+                  <><Loader2 className="h-3.5 w-3.5 animate-spin" />{tr ? "Oluşturuluyor…" : "Generating…"}</>
+                ) : (
+                  <><Sparkles className="h-3.5 w-3.5 text-violet-500" />{tr ? "YZ Oluştur" : "AI Generate"}</>
+                )}
+              </Button>
+            </div>
+            <div className="p-4">
+              <Textarea
+                value={form[s.formKey]}
+                onChange={(e) => setForm((p) => ({ ...p, [s.formKey]: e.target.value }))}
+                rows={5}
+                placeholder={tr ? `${s.labelTr} metnini buraya yazın…` : `Write ${s.labelEn} narrative here…`}
+                className="resize-none text-sm"
+              />
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Action bar */}
+      <div className="flex flex-wrap items-center gap-2 border-t border-slate-200 pt-4">
+        <Button onClick={() => void save()} disabled={saving}>
+          {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
+          {saving ? (tr ? "Kaydediliyor…" : "Saving…") : (tr ? "Kaydet" : "Save")}
+        </Button>
+        <Button variant="outline" onClick={() => void generateDraft()}>
+          {tr ? "Taslak Oluştur" : "Generate Draft"}
+        </Button>
+        <Button variant="outline" onClick={() => void exportHtml()}>
+          <FileDown className="h-3.5 w-3.5" />
+          {tr ? "HTML İndir" : "Export HTML"}
+        </Button>
+        <Button variant="outline" onClick={() => void approveReport()}>
+          <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
+          {tr ? "Onayla" : "Approve"}
+        </Button>
+        <Button onClick={() => void submitForCertification()}>
+          <Send className="h-3.5 w-3.5" />
+          {tr ? "Belgelendirmeye Gönder" : "Submit for Certification"}
+        </Button>
+      </div>
+
+      <p className="text-xs text-slate-400">
+        {tr
+          ? "Bu platform yapılandırılmış sürdürülebilirlik raporlama desteği sunar. Nihai mevzuat uyumu belgelendirme kararları yetkin profesyonellerin incelemesini gerektirir."
           : "This platform provides structured sustainability reporting support. Final regulatory compliance and certification decisions require review by qualified professionals."}
       </p>
-
-      <div className="grid gap-3 rounded-lg border border-slate-200 bg-white p-4">
-        <label className="text-sm font-medium">{locale === "tr" ? "Yönetişim" : "Governance"}</label>
-        <Textarea value={form.governanceText} onChange={(e) => setForm((p) => ({ ...p, governanceText: e.target.value }))} />
-        <label className="text-sm font-medium">{locale === "tr" ? "Strateji" : "Strategy"}</label>
-        <Textarea value={form.strategyText} onChange={(e) => setForm((p) => ({ ...p, strategyText: e.target.value }))} />
-        <label className="text-sm font-medium">{locale === "tr" ? "Risk Yönetimi" : "Risk Management"}</label>
-        <Textarea
-          value={form.riskManagementText}
-          onChange={(e) => setForm((p) => ({ ...p, riskManagementText: e.target.value }))}
-        />
-        <label className="text-sm font-medium">{locale === "tr" ? "Metrikler ve Hedefler" : "Metrics & Targets"}</label>
-        <Textarea
-          value={form.metricsTargetsText}
-          onChange={(e) => setForm((p) => ({ ...p, metricsTargetsText: e.target.value }))}
-        />
-      </div>
-
-      <div className="flex flex-wrap gap-2">
-        <Button onClick={save}>{locale === "tr" ? "Kaydet" : "Save"}</Button>
-        <Button variant="outline" onClick={generateDraft}>
-          {locale === "tr" ? "Taslak Oluştur" : "Generate Draft"}
-        </Button>
-        <Button variant="outline" onClick={exportHtml}>
-          {locale === "tr" ? "HTML Dışa Aktar" : "Export HTML"}
-        </Button>
-        <Button onClick={submitForCertification}>{locale === "tr" ? "Belgelendirmeye Gönder" : "Submit for Certification"}</Button>
-      </div>
     </div>
   );
 }

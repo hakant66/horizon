@@ -70,9 +70,22 @@ export function DataCollectionClient({ entries, users }: { entries: Entry[]; use
   const [rows, setRows] = useState<Entry[]>(entries);
   const [message, setMessage] = useState("");
   const [bulkOwnerId, setBulkOwnerId] = useState(users[0]?.id || "");
+  const [aiLoading, setAiLoading] = useState(false);
   const fileRef = useRef<HTMLInputElement | null>(null);
 
   async function updateEntry(row: Entry) {
+    // Guard: reject non-numeric input before sending to the server.
+    if (row.value !== null && row.value !== undefined && row.value !== "") {
+      const numeric = Number(row.value);
+      if (!Number.isFinite(numeric)) {
+        setMessage(
+          locale === "tr"
+            ? `"${String(row.value)}" geçerli bir sayı değil. Lütfen sayısal bir değer girin.`
+            : `"${String(row.value)}" is not a valid number. Please enter a numeric value.`,
+        );
+        return;
+      }
+    }
     const res = await fetch("/api/metrics", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -81,21 +94,94 @@ export function DataCollectionClient({ entries, users }: { entries: Entry[]; use
         facilityId: row.facilityId,
         reportingPeriodId: row.reportingPeriodId,
         metricDefinitionId: row.metricDefinitionId,
-        value: row.value ? Number(row.value) : null,
+        value: row.value !== null && row.value !== undefined && row.value !== "" ? Number(row.value) : null,
         unit: row.unit,
         status: row.status,
         ownerUserId: row.ownerUserId,
       }),
     });
-    setMessage(
-      res.ok
-        ? locale === "tr"
-          ? "Metrik güncellendi"
-          : "Metric updated"
-        : locale === "tr"
-          ? "Metrik güncellemesi başarısız"
-          : "Metric update failed",
-    );
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({})) as { error?: string };
+      setMessage(err.error ?? (locale === "tr" ? "Metrik güncellemesi başarısız" : "Metric update failed"));
+      return;
+    }
+    const data = await res.json().catch(() => ({})) as { anomaly?: { pctChange: number; isWarning: boolean } };
+    const pct = data.anomaly?.pctChange;
+    if (data.anomaly?.isWarning && pct !== undefined && !Number.isNaN(pct)) {
+      setMessage(
+        locale === "tr"
+          ? `Metrik güncellendi — ⚠ Yıllık değişim: %${pct.toFixed(1)} (anormallik uyarısı)`
+          : `Metric updated — ⚠ YoY change: ${pct.toFixed(1)}% (anomaly warning)`,
+      );
+    } else {
+      setMessage(locale === "tr" ? "Metrik güncellendi" : "Metric updated");
+    }
+  }
+
+  async function fillFromAI() {
+    if (!rows.length) return;
+    setAiLoading(true);
+    setMessage(locale === "tr" ? "AI metrikleri dolduruyor..." : "AI filling metrics...");
+    try {
+      const metricList = rows.map((r) => ({ id: r.id, name: r.metricDefinition.name, unit: r.metricDefinition.unit }));
+      const res = await fetch("/api/ai/rag", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ target: "metrics", metrics: metricList }),
+      });
+      if (!res.ok) {
+        const err = (await res.json()) as { error?: string };
+        setMessage(err.error ?? (locale === "tr" ? "AI doldurulamadı" : "AI fill failed"));
+        return;
+      }
+      const data = (await res.json()) as { values: Record<string, number> };
+      const filled = Object.keys(data.values).length;
+      if (filled === 0) {
+        setMessage(locale === "tr" ? "AI ilgili değer bulamadı." : "AI could not find relevant values.");
+        return;
+      }
+      setRows((prev) =>
+        prev.map((row) => {
+          const val = data.values[row.id];
+          return val !== undefined ? { ...row, value: String(val) } : row;
+        }),
+      );
+      setMessage(
+        locale === "tr"
+          ? `AI ${filled} metriği doldurdu. Lütfen kontrol edip kaydedin.`
+          : `AI filled ${filled} metrics. Please review and save.`,
+      );
+    } catch {
+      setMessage(locale === "tr" ? "AI servisine ulaşılamadı" : "Could not reach AI service");
+    } finally {
+      setAiLoading(false);
+    }
+  }
+
+  async function runAiReview() {
+    const reportingPeriodId = rows[0]?.reportingPeriodId;
+    if (!reportingPeriodId) return;
+    setMessage(locale === "tr" ? "YZ incelemesi çalışıyor…" : "AI review running…");
+    const res = await fetch("/api/metrics/ai-review", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ reportingPeriodId, locale }),
+    });
+    if (!res.ok) {
+      setMessage(locale === "tr" ? "YZ incelemesi başarısız" : "AI review failed");
+      return;
+    }
+    const data = await res.json() as { review: string };
+    setMessage(data.review ?? (locale === "tr" ? "İnceleme tamamlandı" : "Review complete"));
+  }
+
+  function exportCsv() {
+    const reportingPeriodId = rows[0]?.reportingPeriodId;
+    const url = `/api/export/metrics${reportingPeriodId ? `?reportingPeriodId=${reportingPeriodId}` : ""}`;
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "metrics.csv";
+    a.click();
   }
 
   async function uploadCsv(file: File) {
@@ -188,13 +274,12 @@ export function DataCollectionClient({ entries, users }: { entries: Entry[]; use
   }
 
   return (
-    <div className="space-y-3">
-      <p className="text-sm text-slate-600">
-        {locale === "tr"
-          ? "Kanıtlar, raporlanan verinin güvenilirliğini destekler ve inceleme ile belgelendirme için gereklidir."
-          : "Evidence supports the reliability of reported data and is required for review and certification."}
-      </p>
-      {message ? <p className="text-sm text-slate-600">{message}</p> : null}
+    <div className="space-y-5">
+      {message ? (
+        <div className={`rounded-lg border px-4 py-2.5 text-sm font-medium ${message.startsWith("⚠") || message.includes("uyarı") ? "border-amber-200 bg-amber-50 text-amber-800" : "border-slate-200 bg-slate-50 text-slate-700"}`}>
+          {message}
+        </div>
+      ) : null}
 
       <DataTable
         data={rows}
@@ -273,22 +358,34 @@ export function DataCollectionClient({ entries, users }: { entries: Entry[]; use
         }}
       />
 
-      <div className="flex flex-wrap gap-2">
-        <Button variant="outline" onClick={() => fileRef.current?.click()}>
-          {locale === "tr" ? "Excel/CSV Yükle" : "Upload Excel/CSV"}
+      {/* Action bar */}
+      <div className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+        <Button variant="outline" size="sm" onClick={() => fileRef.current?.click()}>
+          {locale === "tr" ? "CSV Yükle" : "Upload CSV"}
         </Button>
-        <Button variant="outline" onClick={validateData}>
-          {locale === "tr" ? "Veriyi Doğrula" : "Validate Data"}
+        <Button variant="outline" size="sm" onClick={exportCsv}>
+          {locale === "tr" ? "CSV İndir" : "Export CSV"}
         </Button>
-        <Select
-          value={bulkOwnerId}
-          onChange={setBulkOwnerId}
-          options={users.map((u) => ({ label: `${u.name} (${u.email})`, value: u.id }))}
-          className="w-[320px]"
-        />
-        <Button variant="outline" onClick={() => void assignOwnersBulk()}>
-          {locale === "tr" ? "Sorumlu Ata (Toplu)" : "Assign Owners (Bulk)"}
+        <Button variant="outline" size="sm" onClick={validateData}>
+          {locale === "tr" ? "Doğrula" : "Validate"}
         </Button>
+        <Button variant="outline" size="sm" onClick={() => void fillFromAI()} disabled={aiLoading}>
+          {aiLoading ? (locale === "tr" ? "Yükleniyor..." : "Loading...") : (locale === "tr" ? "AI ile Doldur" : "Fill with AI")}
+        </Button>
+        <Button variant="outline" size="sm" onClick={() => void runAiReview()}>
+          {locale === "tr" ? "YZ İncelemesi" : "AI Review"}
+        </Button>
+        <div className="ml-auto flex items-center gap-2">
+          <Select
+            value={bulkOwnerId}
+            onChange={setBulkOwnerId}
+            options={users.map((u) => ({ label: `${u.name}`, value: u.id }))}
+            className="w-[200px] h-8 text-xs"
+          />
+          <Button variant="outline" size="sm" onClick={() => void assignOwnersBulk()}>
+            {locale === "tr" ? "Toplu Ata" : "Bulk Assign"}
+          </Button>
+        </div>
       </div>
     </div>
   );

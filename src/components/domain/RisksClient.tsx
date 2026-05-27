@@ -446,10 +446,10 @@ export function RisksClient({
             <div>
               <label className="text-xs text-slate-600">{tr ? "Durum" : "Status"}</label>
               <select name="status" className="h-9 w-full rounded-md border border-slate-300 px-3 text-sm">
-                <option value="Open">Open</option>
-                <option value="Mitigated">Mitigated</option>
-                <option value="Accepted">Accepted</option>
-                <option value="Transferred">Transferred</option>
+                <option value="Open">{tr ? "Açık" : "Open"}</option>
+                <option value="Mitigated">{tr ? "Azaltıldı" : "Mitigated"}</option>
+                <option value="Accepted">{tr ? "Kabul Edildi" : "Accepted"}</option>
+                <option value="Transferred">{tr ? "Transfer Edildi" : "Transferred"}</option>
               </select>
             </div>
 
@@ -529,9 +529,9 @@ export function RisksClient({
             <div>
               <label className="text-xs text-slate-600">{tr ? "Sıcaklık Yolu *" : "Temperature Pathway *"}</label>
               <select name="temperaturePathway" className="h-9 w-full rounded-md border border-slate-300 px-3 text-sm">
-                <option value="1.5C">1.5°C (Paris Aligned)</option>
-                <option value="2C">2°C (Moderate Transition)</option>
-                <option value="4C">4°C (High Warming)</option>
+                <option value="1.5C">1.5°C ({tr ? "Paris Uyumlu" : "Paris Aligned"})</option>
+                <option value="2C">2°C ({tr ? "Ilımlı Geçiş" : "Moderate Transition"})</option>
+                <option value="4C">4°C ({tr ? "Yüksek Isınma" : "High Warming"})</option>
               </select>
             </div>
 
@@ -542,27 +542,27 @@ export function RisksClient({
                 <option value="NGFS">NGFS</option>
                 <option value="IEA NZE">IEA NZE</option>
                 <option value="IPCC SSP">IPCC SSP</option>
-                <option value="Custom">Custom</option>
+                <option value="Custom">{tr ? "Özel" : "Custom"}</option>
               </select>
             </div>
 
             <div>
               <label className="text-xs text-slate-600">{tr ? "Gelir Etkisi (%)" : "Revenue Impact (%)"}</label>
-              <Input type="number" step="0.1" name="estimatedRevenueImpactPercent" placeholder="e.g. -5.2" />
+              <Input type="number" step="0.1" name="estimatedRevenueImpactPercent" placeholder={tr ? "örn: -5.2" : "e.g. -5.2"} />
             </div>
 
             <div>
               <label className="text-xs text-slate-600">{tr ? "Maliyet Etkisi (USD)" : "Cost Impact (USD)"}</label>
-              <Input type="number" step="0.01" name="estimatedCostImpact" placeholder="e.g. 50000" />
+              <Input type="number" step="0.01" name="estimatedCostImpact" placeholder={tr ? "örn: 50000" : "e.g. 50000"} />
             </div>
 
             <div>
               <label className="text-xs text-slate-600">{tr ? "Güven Düzeyi" : "Confidence Level"}</label>
               <select name="confidenceLevel" className="h-9 w-full rounded-md border border-slate-300 px-3 text-sm">
                 <option value="">{tr ? "Seçiniz" : "Select"}</option>
-                <option value="Low">Low</option>
-                <option value="Medium">Medium</option>
-                <option value="High">High</option>
+                <option value="Low">{tr ? "Düşük" : "Low"}</option>
+                <option value="Medium">{tr ? "Orta" : "Medium"}</option>
+                <option value="High">{tr ? "Yüksek" : "High"}</option>
               </select>
             </div>
 

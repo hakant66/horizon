@@ -9,7 +9,16 @@ export default async function MaterialityPage() {
   const { organization, reportingPeriod } = await getWorkspaceContext();
 
   if (!reportingPeriod) {
-    return <EmptyState title="No reporting period" description="Create a reporting period in Setup first." />;
+    return (
+      <EmptyState
+        title="No reporting period"
+        titleTr="Raporlama dönemi yok"
+        titleEn="No reporting period"
+        description="Create a reporting period in Setup first."
+        descriptionTr="Önce Kurulum bölümünde bir raporlama dönemi oluşturun."
+        descriptionEn="Create a reporting period in Setup first."
+      />
+    );
   }
 
   const topics = await prisma.materialityTopic.findMany({

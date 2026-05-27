@@ -46,6 +46,7 @@ export default async function EmissionsPage() {
         descriptionEn="Calculate and review Scope 1 and Scope 2 emissions with transparent formulas."
       />
       <EmissionsClient
+        reportingPeriodId={reportingPeriod.id}
         calculations={calculations.map((row) => ({
           ...row,
           activityValue: row.activityValue.toString(),

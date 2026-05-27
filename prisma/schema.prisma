@@ -13,6 +13,56 @@ enum UserRole {
   DATA_CONTRIBUTOR
   FINANCE_REVIEWER
   AUDITOR
+  HORIZON_CONSULTANT
+}
+
+enum ConsolidationMethod {
+  OPERATIONAL_CONTROL
+  FINANCIAL_CONTROL
+  EQUITY_SHARE
+}
+
+enum RiskOrOpportunity {
+  RISK
+  OPPORTUNITY
+}
+
+enum Scope2Method {
+  LOCATION_BASED
+  MARKET_BASED
+}
+
+enum TaskPriority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum TaskStatus {
+  OPEN
+  IN_PROGRESS
+  DONE
+  OVERDUE
+  CANCELLED
+}
+
+enum ApprovalStage {
+  DATA_ENTRY
+  MANAGER_REVIEW
+  HORIZON_REVIEW
+  APPROVED
+  REVISION_REQUESTED
+}
+
+enum NotificationType {
+  TASK_ASSIGNED
+  TASK_OVERDUE
+  REVISION_REQUESTED
+  METRIC_APPROVED
+  ANSWER_APPROVED
+  REPORT_READY_FOR_REVIEW
+  CERTIFICATION_DECISION
 }
 
 enum ReportingPeriodStatus {
@@ -28,6 +78,7 @@ enum MetricEntryStatus {
   SUBMITTED
   VALIDATED
   NEEDS_CORRECTION
+  READY_FOR_EXTERNAL_ASSURANCE
 }
 
 enum EvidenceStatus {
@@ -89,6 +140,7 @@ enum LinkedEntityType {
   CLIMATE_RISK
   REPORT
   CERTIFICATION_SUBMISSION
+  QUESTIONNAIRE_ANSWER
 }
 
 enum QuestionnaireType {
@@ -112,10 +164,15 @@ model Organization {
   isPublicInterestEntity Boolean?
   headquartersCountry    String
   reportingCurrency      String
+  consolidationMethod    ConsolidationMethod?
   createdAt              DateTime @default(now())
   updatedAt              DateTime @updatedAt
 
   users                    User[]
+  subsidiaries             Subsidiary[]
+  businessUnits            BusinessUnit[]
+  tasks                    Task[]
+  notifications            Notification[]
   facilities               Facility[]
   reportingPeriods         ReportingPeriod[]
   metricEntries            MetricEntry[]
@@ -134,6 +191,9 @@ model Organization {
   questionnaireAnswers     QuestionnaireAnswer[]
   auditLogs                AuditLog[]
   esgSummary               EsgSummary?
+  knowledgeBaseDocuments   KnowledgeBaseDocument[]
+  knowledgeBaseChunks      KnowledgeBaseChunk[]
+  aiSettings               AiSettings?
 }
 
 model User {
@@ -156,7 +216,14 @@ model User {
   questionnaireAnswers       QuestionnaireAnswer[]     @relation("QuestionnaireAnsweringUser")
   questionnaireAnswerUpdates QuestionnaireAnswer[]     @relation("QuestionnaireUpdatedBy")
   questionnaireAnswerDeletes QuestionnaireAnswer[]     @relation("QuestionnaireDeletedBy")
+  assignedTasks              Task[]                    @relation("TaskAssignedTo")
+  createdTasks               Task[]                    @relation("TaskAssignedBy")
+  approvedReports            Report[]                  @relation("ReportApprover")
+  lockedPeriods              ReportingPeriod[]         @relation("PeriodLocker")
+  reviewedEvidence           Evidence[]                @relation("EvidenceReviewer")
+  notifications              Notification[]
   auditLogs                  AuditLog[]
+  uploadedKbDocuments        KnowledgeBaseDocument[]
 }
 
 model Facility {
@@ -182,10 +249,13 @@ model ReportingPeriod {
   startDate      DateTime
   endDate        DateTime
   status         ReportingPeriodStatus
+  lockedById     String?
+  lockedAt       DateTime?
   createdAt      DateTime              @default(now())
   updatedAt      DateTime              @updatedAt
 
   organization         Organization              @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  lockedBy             User?                     @relation("PeriodLocker", fields: [lockedById], references: [id], onDelete: SetNull)
   metricEntries        MetricEntry[]
   emissionCalculations EmissionCalculation[]
   materialityTopics    MaterialityTopic[]
@@ -194,6 +264,7 @@ model ReportingPeriod {
   reports              Report[]
   certifications       CertificationSubmission[]
   questionnaireAnswers QuestionnaireAnswer[]
+  tasks                Task[]
 
   @@unique([organizationId, name])
 }
@@ -218,9 +289,11 @@ model MetricEntry {
   facilityId         String
   reportingPeriodId  String
   metricDefinitionId String
+  businessUnitId     String?
   value              Decimal?          @db.Decimal(14, 4)
   unit               String
   status             MetricEntryStatus @default(NOT_STARTED)
+  approvalStage      ApprovalStage     @default(DATA_ENTRY)
   ownerUserId        String?
   notes              String?
   createdAt          DateTime          @default(now())
@@ -228,6 +301,7 @@ model MetricEntry {
 
   organization     Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   facility         Facility              @relation(fields: [facilityId], references: [id], onDelete: Cascade)
+  businessUnit     BusinessUnit?         @relation(fields: [businessUnitId], references: [id], onDelete: SetNull)
   reportingPeriod  ReportingPeriod       @relation(fields: [reportingPeriodId], references: [id], onDelete: Cascade)
   metricDefinition MetricDefinition      @relation(fields: [metricDefinitionId], references: [id], onDelete: Restrict)
   ownerUser        User?                 @relation("MetricEntryOwner", fields: [ownerUserId], references: [id])
@@ -247,6 +321,8 @@ model Evidence {
   fileType         String
   fileSize         Int
   uploadedById     String
+  reviewedById     String?
+  reviewedAt       DateTime?
   status           EvidenceStatus   @default(UPLOADED)
   reviewerComment  String?
   createdAt        DateTime         @default(now())
@@ -254,6 +330,7 @@ model Evidence {
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   uploadedBy   User         @relation("EvidenceUploader", fields: [uploadedById], references: [id], onDelete: Restrict)
+  reviewedBy   User?        @relation("EvidenceReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
 }
 
 model EmissionFactor {
@@ -266,6 +343,7 @@ model EmissionFactor {
   source       String
   versionYear  Int
   scope        EmissionScope
+  scope2Method Scope2Method?
   category     String
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
@@ -281,6 +359,7 @@ model EmissionCalculation {
   metricEntryId      String
   emissionFactorId   String
   scope              EmissionScope
+  scope2Method       Scope2Method?
   scope3Category     String?
   activityValue      Decimal       @db.Decimal(14, 4)
   activityUnit       String
@@ -320,10 +399,11 @@ model MaterialityTopic {
 }
 
 model ClimateRisk {
-  id                      String          @id @default(cuid())
+  id                      String             @id @default(cuid())
   organizationId          String
   reportingPeriodId       String
   facilityId              String?
+  entryType               RiskOrOpportunity  @default(RISK)
   name                    String
   type                    ClimateRiskType
   probability             String
@@ -403,12 +483,17 @@ model Report {
   metricsTargetsText String?
   generatedAt        DateTime?
   submittedAt        DateTime?
+  approvedById       String?
+  approvedAt         DateTime?
   createdAt          DateTime        @default(now())
   updatedAt          DateTime        @updatedAt
 
   organization    Organization              @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   reportingPeriod ReportingPeriod           @relation(fields: [reportingPeriodId], references: [id], onDelete: Cascade)
+  approvedBy      User?                     @relation("ReportApprover", fields: [approvedById], references: [id], onDelete: SetNull)
   certifications  CertificationSubmission[]
+
+  @@index([organizationId, status])
 }
 
 model CertificationSubmission {
@@ -532,6 +617,16 @@ model QuestionnaireQuestion {
   video_link                String?
   sourceSheet               String?
   sourceRowNumber           Int?
+  version                   Int      @default(1)
+  isActive                  Boolean  @default(true)
+  supersededById            String?
+  standardCode              String?
+  evidenceType              String?
+  isMandatory               Boolean  @default(false)
+  acceptanceCriteria        String?
+  errorWarning              String?
+  minValue                  Decimal? @db.Decimal(14, 4)
+  maxValue                  Decimal? @db.Decimal(14, 4)
   created_datetime          DateTime @default(now())
   updated_datetime          DateTime @updatedAt
 
@@ -557,6 +652,7 @@ model QuestionnaireAnswer {
   updated_timestamp       DateTime?
   deleted_by_id           String?
   deleted_timestamp       DateTime?
+  approvalStage           ApprovalStage @default(DATA_ENTRY)
   createdAt               DateTime  @default(now())
 
   organization          Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
@@ -626,6 +722,97 @@ model EsgSummary {
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 }
 
+model Notification {
+  id             String           @id @default(cuid())
+  organizationId String
+  userId         String
+  type           NotificationType
+  title          String
+  body           String?
+  entityType     String?
+  entityId       String?
+  isRead         Boolean          @default(false)
+  createdAt      DateTime         @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead])
+  @@index([organizationId, createdAt])
+}
+
+model Subsidiary {
+  id               String   @id @default(cuid())
+  organizationId   String
+  name             String
+  country          String
+  ownershipPercent Decimal  @db.Decimal(5, 2)
+  isInScope        Boolean  @default(true)
+  consolidationNote String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+}
+
+model BusinessUnit {
+  id             String   @id @default(cuid())
+  organizationId String
+  name           String
+  parentId       String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization  Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  parent        BusinessUnit?  @relation("BUHierarchy", fields: [parentId], references: [id])
+  children      BusinessUnit[] @relation("BUHierarchy")
+  metricEntries MetricEntry[]
+
+  @@unique([organizationId, name])
+}
+
+model SectorDefinition {
+  id       String  @id @default(cuid())
+  code     String  @unique
+  name_tr  String
+  name_en  String
+  parentId String?
+  isActive Boolean @default(true)
+  metricCodes String[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  parent   SectorDefinition?  @relation("SectorTree", fields: [parentId], references: [id])
+  children SectorDefinition[] @relation("SectorTree")
+}
+
+model Task {
+  id                String       @id @default(cuid())
+  organizationId    String
+  reportingPeriodId String?
+  assignedToId      String
+  assignedById      String
+  title             String
+  description       String?
+  entityType        String?
+  entityId          String?
+  dueDate           DateTime?
+  priority          TaskPriority @default(MEDIUM)
+  status            TaskStatus   @default(OPEN)
+  completedAt       DateTime?
+  reminderSentAt    DateTime?
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+
+  organization    Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  reportingPeriod ReportingPeriod? @relation(fields: [reportingPeriodId], references: [id], onDelete: SetNull)
+  assignedTo      User             @relation("TaskAssignedTo", fields: [assignedToId], references: [id], onDelete: Restrict)
+  assignedBy      User             @relation("TaskAssignedBy", fields: [assignedById], references: [id], onDelete: Restrict)
+
+  @@index([organizationId, status])
+  @@index([assignedToId, status])
+}
+
 model AuditLog {
   id              String   @id @default(cuid())
   organizationId  String
@@ -641,4 +828,58 @@ model AuditLog {
   user         User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
 
   @@index([organizationId, createdAt])
+}
+
+model KnowledgeBaseDocument {
+  id             String   @id @default(cuid())
+  organizationId String
+  uploadedById   String
+  fileName       String
+  fileType       String
+  fileSize       Int
+  storedPath     String
+  encryptionIv   String
+  authTag        String
+  description    String?
+  uploadedAt     DateTime @default(now())
+
+  organization Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  uploadedBy   User                  @relation(fields: [uploadedById], references: [id], onDelete: Restrict)
+  chunks       KnowledgeBaseChunk[]
+
+  @@index([organizationId, uploadedAt])
+}
+
+model KnowledgeBaseChunk {
+  id             String                       @id @default(cuid())
+  organizationId String
+  documentId     String
+  content        String
+  chunkIndex     Int
+  tokenCount     Int                          @default(0)
+  embedding      Unsupported("vector(1536)")?
+  createdAt      DateTime                     @default(now())
+
+  organization Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  document     KnowledgeBaseDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([documentId])
+}
+
+model AiSettings {
+  id               String    @id @default(cuid())
+  organizationId   String    @unique
+  llmProvider      String    @default("openai")
+  llmModel         String    @default("gpt-4o-mini")
+  openaiApiKey     String?
+  anthropicApiKey  String?
+  googleApiKey     String?
+  indexedAt        DateTime?
+  indexedChunks    Int       @default(0)
+  indexedDocs      Int       @default(0)
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 }

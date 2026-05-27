@@ -6,7 +6,7 @@ import { createAuditLog } from "@/lib/audit";
 
 export async function GET() {
   try {
-    const user = await requireRole(["ADMIN", "SUSTAINABILITY_MANAGER", "FINANCE_REVIEWER", "AUDITOR"]);
+    const user = await requireRole(["ADMIN", "SUSTAINABILITY_MANAGER", "DATA_CONTRIBUTOR", "FINANCE_REVIEWER", "AUDITOR", "HORIZON_CONSULTANT"]);
     const periods = await prisma.reportingPeriod.findMany({ where: { organizationId: user.organizationId }, orderBy: { startDate: "desc" } });
     return apiOk(periods);
   } catch (error) {

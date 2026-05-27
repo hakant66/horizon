@@ -7,6 +7,19 @@ export const roleCapabilities: Record<UserRole, string[]> = {
   DATA_CONTRIBUTOR: ["metrics:write", "evidence:upload"],
   FINANCE_REVIEWER: ["workflow:read", "approval:report", "comment"],
   AUDITOR: ["certification:review", "comment", "decision"],
+  HORIZON_CONSULTANT: [
+    "all:read",
+    "report:review",
+    "report:approve",
+    "certification:review",
+    "certification:decide",
+    "comment",
+    "task:assign",
+    "bulk:revision",
+    "sector:admin",
+    "ai:review",
+    "audit:view",
+  ],
 };
 
 export async function requireAuth() {

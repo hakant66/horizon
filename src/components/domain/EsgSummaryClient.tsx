@@ -90,6 +90,7 @@ export function EsgSummaryClient({
   const [form, setForm] = useState<EsgSummaryData>(initial ?? {});
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
+  const [aiLoading, setAiLoading] = useState(false);
 
   function setStr(key: keyof EsgSummaryData, value: string) {
     setForm((prev) => ({ ...prev, [key]: value || null }));
@@ -101,6 +102,75 @@ export function EsgSummaryClient({
 
   function setBool(key: keyof EsgSummaryData, value: boolean | null) {
     setForm((prev) => ({ ...prev, [key]: value }));
+  }
+
+  async function fillFromAI() {
+    setAiLoading(true);
+    setMessage(null);
+    try {
+      const res = await fetch("/api/ai/rag", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ target: "esg" }),
+      });
+      if (!res.ok) {
+        const err = (await res.json()) as { error?: string };
+        setMessage({ ok: false, text: err.error ?? (tr ? "AI doldurulamadı" : "AI fill failed") });
+        return;
+      }
+      const data = (await res.json()) as { fields: Record<string, unknown> };
+      const f = data.fields;
+      const numField = (k: string) => typeof f[k] === "number" ? f[k] as number : undefined;
+      const strField = (k: string) => typeof f[k] === "string" ? f[k] as string : undefined;
+      const boolField = (k: string) => typeof f[k] === "boolean" ? f[k] as boolean : undefined;
+      setForm((prev) => ({
+        ...prev,
+        ...(strField("legalName") !== undefined ? { legalName: strField("legalName") } : {}),
+        ...(strField("brandPortfolio") !== undefined ? { brandPortfolio: strField("brandPortfolio") } : {}),
+        ...(strField("naceCode") !== undefined ? { naceCode: strField("naceCode") } : {}),
+        ...(strField("sectorDescription") !== undefined ? { sectorDescription: strField("sectorDescription") } : {}),
+        ...(strField("operatingCountries") !== undefined ? { operatingCountries: strField("operatingCountries") } : {}),
+        ...(strField("reportBoundaryNote") !== undefined ? { reportBoundaryNote: strField("reportBoundaryNote") } : {}),
+        ...(numField("totalEmployees") !== undefined ? { totalEmployees: numField("totalEmployees") } : {}),
+        ...(numField("employeeBlueCollar") !== undefined ? { employeeBlueCollar: numField("employeeBlueCollar") } : {}),
+        ...(numField("employeeWhiteCollar") !== undefined ? { employeeWhiteCollar: numField("employeeWhiteCollar") } : {}),
+        ...(numField("employeeMale") !== undefined ? { employeeMale: numField("employeeMale") } : {}),
+        ...(numField("employeeFemale") !== undefined ? { employeeFemale: numField("employeeFemale") } : {}),
+        ...(numField("employeePermanent") !== undefined ? { employeePermanent: numField("employeePermanent") } : {}),
+        ...(numField("employeeTemporary") !== undefined ? { employeeTemporary: numField("employeeTemporary") } : {}),
+        ...(numField("femaleManagerPercent") !== undefined ? { femaleManagerPercent: numField("femaleManagerPercent") } : {}),
+        ...(numField("employeeTurnoverRate") !== undefined ? { employeeTurnoverRate: numField("employeeTurnoverRate") } : {}),
+        ...(numField("avgTrainingHoursPerEmployee") !== undefined ? { avgTrainingHoursPerEmployee: numField("avgTrainingHoursPerEmployee") } : {}),
+        ...(numField("lostTimeInjuryRate") !== undefined ? { lostTimeInjuryRate: numField("lostTimeInjuryRate") } : {}),
+        ...(boolField("supplierSocialAuditConducted") !== undefined ? { supplierSocialAuditConducted: boolField("supplierSocialAuditConducted") } : {}),
+        ...(numField("annualRevenue") !== undefined ? { annualRevenue: numField("annualRevenue") } : {}),
+        ...(numField("ebitda") !== undefined ? { ebitda: numField("ebitda") } : {}),
+        ...(numField("netProfit") !== undefined ? { netProfit: numField("netProfit") } : {}),
+        ...(numField("totalAssets") !== undefined ? { totalAssets: numField("totalAssets") } : {}),
+        ...(numField("totalEquity") !== undefined ? { totalEquity: numField("totalEquity") } : {}),
+        ...(numField("rdExpenditure") !== undefined ? { rdExpenditure: numField("rdExpenditure") } : {}),
+        ...(numField("sustainabilityCapexForecast") !== undefined ? { sustainabilityCapexForecast: numField("sustainabilityCapexForecast") } : {}),
+        ...(numField("scope1Emissions") !== undefined ? { scope1Emissions: numField("scope1Emissions") } : {}),
+        ...(numField("scope2Emissions") !== undefined ? { scope2Emissions: numField("scope2Emissions") } : {}),
+        ...(numField("scope3Emissions") !== undefined ? { scope3Emissions: numField("scope3Emissions") } : {}),
+        ...(numField("annualElectricityConsumption") !== undefined ? { annualElectricityConsumption: numField("annualElectricityConsumption") } : {}),
+        ...(numField("annualNaturalGasConsumption") !== undefined ? { annualNaturalGasConsumption: numField("annualNaturalGasConsumption") } : {}),
+        ...(numField("annualFuelConsumption") !== undefined ? { annualFuelConsumption: numField("annualFuelConsumption") } : {}),
+        ...(numField("renewableEnergyPercent") !== undefined ? { renewableEnergyPercent: numField("renewableEnergyPercent") } : {}),
+        ...(numField("annualWaterWithdrawal") !== undefined ? { annualWaterWithdrawal: numField("annualWaterWithdrawal") } : {}),
+        ...(numField("wasteRecyclingRate") !== undefined ? { wasteRecyclingRate: numField("wasteRecyclingRate") } : {}),
+        ...(strField("sustainabilityGovernanceBody") !== undefined ? { sustainabilityGovernanceBody: strField("sustainabilityGovernanceBody") } : {}),
+        ...(strField("businessResilienceAssessment") !== undefined ? { businessResilienceAssessment: strField("businessResilienceAssessment") } : {}),
+        ...(boolField("antiBriberyPolicyUpdated") !== undefined ? { antiBriberyPolicyUpdated: boolField("antiBriberyPolicyUpdated") } : {}),
+        ...(boolField("gdprKvkkPolicyUpdated") !== undefined ? { gdprKvkkPolicyUpdated: boolField("gdprKvkkPolicyUpdated") } : {}),
+        ...(boolField("climateRiskInRiskRegister") !== undefined ? { climateRiskInRiskRegister: boolField("climateRiskInRiskRegister") } : {}),
+      }));
+      setMessage({ ok: true, text: tr ? "Alanlar AI ile dolduruldu. Lütfen kontrol edip kaydedin." : "Fields filled by AI. Please review and save." });
+    } catch {
+      setMessage({ ok: false, text: tr ? "AI servisine ulaşılamadı" : "Could not reach AI service" });
+    } finally {
+      setAiLoading(false);
+    }
   }
 
   async function handleSave() {
@@ -560,7 +630,10 @@ export function EsgSummaryClient({
         </CardContent>
       </Card>
 
-      <div className="flex justify-end">
+      <div className="flex items-center justify-end gap-3">
+        <Button variant="outline" onClick={() => void fillFromAI()} disabled={aiLoading}>
+          {aiLoading ? (tr ? "Yükleniyor..." : "Loading...") : (tr ? "AI ile Doldur" : "Fill with AI")}
+        </Button>
         <Button onClick={handleSave} disabled={saving}>
           {saving ? (tr ? "Kaydediliyor..." : "Saving...") : tr ? "ESG Özetini Kaydet" : "Save ESG Summary"}
         </Button>

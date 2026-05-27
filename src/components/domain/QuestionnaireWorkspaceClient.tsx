@@ -74,6 +74,22 @@ export function QuestionnaireWorkspaceClient({
 
   const [selectedQuestionnaireId, setSelectedQuestionnaireId] = useState(initialQuestionnaires[0]?.id || "");
 
+  const [showCloneModal, setShowCloneModal] = useState(false);
+  const [cloneSourceId, setCloneSourceId] = useState(initialQuestionnaires[0]?.id || "");
+  const [cloneNameTr, setCloneNameTr] = useState("");
+  const [cloneNameEn, setCloneNameEn] = useState("");
+  const [cloneLoading, setCloneLoading] = useState(false);
+
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [importNameTr, setImportNameTr] = useState("");
+  const [importNameEn, setImportNameEn] = useState("");
+  const [importType, setImportType] = useState<"VERBAL" | "NUMERIC">("VERBAL");
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [importLoading, setImportLoading] = useState(false);
+  const [importError, setImportError] = useState("");
+
+  const [qaAiLoading, setQaAiLoading] = useState(false);
+
   const selectedQuestionnaire = useMemo(
     () => questionnaires.find((q) => q.id === selectedQuestionnaireId) || questionnaires[0],
     [questionnaires, selectedQuestionnaireId],
@@ -151,6 +167,115 @@ export function QuestionnaireWorkspaceClient({
     if (res.ok) await refreshAll();
   }
 
+  async function cloneQuestionnaire() {
+    if (!cloneSourceId || !cloneNameTr.trim()) return;
+    setCloneLoading(true);
+    const res = await fetch("/api/questionnaire/clone", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sourceQuestionnaireId: cloneSourceId, name_tr: cloneNameTr, name_en: cloneNameEn || null }),
+    });
+    setCloneLoading(false);
+    if (res.ok) {
+      const data = (await res.json()) as { id: string; name_tr: string };
+      setShowCloneModal(false);
+      setCloneNameTr("");
+      setCloneNameEn("");
+      setMessage(locale === "tr" ? `"${data.name_tr}" oluşturuldu.` : `"${data.name_tr}" created.`);
+      await refreshAll(data.id);
+      setSelectedQuestionnaireId(data.id);
+    } else {
+      setMessage(locale === "tr" ? "Kopyalama başarısız." : "Clone failed.");
+    }
+  }
+
+  async function importFromExcel() {
+    if (!importFile || !importNameTr.trim()) return;
+    setImportLoading(true);
+    setImportError("");
+    const fd = new FormData();
+    fd.append("file", importFile);
+    fd.append("name_tr", importNameTr.trim());
+    fd.append("name_en", importNameEn.trim());
+    fd.append("type", importType);
+    const res = await fetch("/api/questionnaire/import", { method: "POST", body: fd });
+    setImportLoading(false);
+    if (res.ok) {
+      const data = (await res.json()) as { id: string; name_tr: string; rowCount: number };
+      setShowImportModal(false);
+      setImportNameTr("");
+      setImportNameEn("");
+      setImportFile(null);
+      setMessage(
+        locale === "tr"
+          ? `"${data.name_tr}" oluşturuldu — ${data.rowCount} soru içe aktarıldı.`
+          : `"${data.name_tr}" created — ${data.rowCount} questions imported.`,
+      );
+      await refreshAll(data.id);
+      setSelectedQuestionnaireId(data.id);
+    } else {
+      const err = (await res.json()) as { error?: string };
+      setImportError(err.error ?? (locale === "tr" ? "İçe aktarma başarısız" : "Import failed"));
+    }
+  }
+
+  async function fillAnswersFromAI() {
+    if (!selectedQuestions.length) return;
+    setQaAiLoading(true);
+    setMessage(locale === "tr" ? "AI yanıtları dolduruyor..." : "AI filling answers...");
+    try {
+      const questions = selectedQuestions.slice(0, 30).map((q) => ({
+        id: q.id,
+        code: q.code,
+        title: q.title,
+        question_text: q.question_text,
+      }));
+      const res = await fetch("/api/ai/rag", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ target: "questionnaire", questions }),
+      });
+      if (!res.ok) {
+        const err = (await res.json()) as { error?: string };
+        setMessage(err.error ?? (locale === "tr" ? "AI doldurulamadı" : "AI fill failed"));
+        return;
+      }
+      const data = (await res.json()) as { answers: Record<string, string> };
+      const filled = Object.keys(data.answers).length;
+      if (filled === 0) {
+        setMessage(locale === "tr" ? "AI ilgili yanıt bulamadı." : "AI could not find relevant answers.");
+        return;
+      }
+      // Save each answer via API
+      const saves = await Promise.all(
+        Object.entries(data.answers).map(([questionId, answer]) =>
+          fetch("/api/questionnaire/answers", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              questionnaireId: selectedQuestionnaireId,
+              questionnaireQuestionId: questionId,
+              reportingPeriodId,
+              answer_text: answer,
+              answer_number: null,
+            }),
+          }),
+        ),
+      );
+      const saved = saves.filter((r) => r.ok).length;
+      await refreshAll();
+      setMessage(
+        locale === "tr"
+          ? `AI ${saved}/${filled} yanıtı kaydetti. Lütfen kontrol edin.`
+          : `AI saved ${saved}/${filled} answers. Please review.`,
+      );
+    } catch {
+      setMessage(locale === "tr" ? "AI servisine ulaşılamadı" : "Could not reach AI service");
+    } finally {
+      setQaAiLoading(false);
+    }
+  }
+
   async function deleteAnswer(answerId: string) {
     const res = await fetch("/api/questionnaire/answers", {
       method: "DELETE",
@@ -172,7 +297,7 @@ export function QuestionnaireWorkspaceClient({
         }
       />
 
-      <div className="flex gap-2">
+      <div className="flex flex-wrap gap-2">
         <Button variant={tab === "setup" ? "default" : "outline"} onClick={() => setTab("setup")}>
           {t("questionnaireSetup")}
         </Button>
@@ -181,6 +306,17 @@ export function QuestionnaireWorkspaceClient({
         </Button>
         <Button variant={tab === "dashboard" ? "default" : "outline"} onClick={() => setTab("dashboard")}>
           {t("questionnaireDashboard")}
+        </Button>
+        <Button
+          variant="outline"
+          onClick={() => {
+            const a = document.createElement("a");
+            a.href = `/api/export/questionnaire?reportingPeriodId=${reportingPeriodId}`;
+            a.download = "questionnaire.csv";
+            a.click();
+          }}
+        >
+          {locale === "tr" ? "CSV İndir" : "Export CSV"}
         </Button>
       </div>
 
@@ -282,12 +418,41 @@ export function QuestionnaireWorkspaceClient({
                 <Input name="name_tr" placeholder="Anket adı (TR)" required />
                 <Input name="name_en" placeholder="Questionnaire name (EN)" />
                 <select name="type" className="h-9 rounded-md border border-slate-300 px-3 text-sm">
-                  <option value="VERBAL">VERBAL</option>
-                  <option value="NUMERIC">NUMERIC</option>
+                  <option value="VERBAL">{locale === "tr" ? "Sözel" : "Verbal"}</option>
+                  <option value="NUMERIC">{locale === "tr" ? "Sayısal" : "Numeric"}</option>
                 </select>
                 <Textarea name="description" placeholder={locale === "tr" ? "Açıklama" : "Description"} />
                 <Button type="submit">{locale === "tr" ? "Anket Oluştur" : "Create Questionnaire"}</Button>
               </form>
+
+              <div className="border-t border-slate-200 pt-3 space-y-2">
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => {
+                    setCloneSourceId(questionnaires[0]?.id || "");
+                    setCloneNameTr("");
+                    setCloneNameEn("");
+                    setShowCloneModal(true);
+                  }}
+                >
+                  {locale === "tr" ? "Taslaktan Yeni Anket Oluştur" : "Create New from Template"}
+                </Button>
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => {
+                    setImportNameTr("");
+                    setImportNameEn("");
+                    setImportType("VERBAL");
+                    setImportFile(null);
+                    setImportError("");
+                    setShowImportModal(true);
+                  }}
+                >
+                  {locale === "tr" ? "Excel'den İçe Aktar" : "Import from Excel"}
+                </Button>
+              </div>
 
               <DataTable
                 data={questionnaires}
@@ -297,7 +462,7 @@ export function QuestionnaireWorkspaceClient({
                     header: locale === "tr" ? "Ad" : "Name",
                     render: (row) => (locale === "tr" ? row.name_tr : row.name_en || row.name_tr),
                   },
-                  { key: "type", header: "Type", render: (row) => row.type },
+                  { key: "type", header: locale === "tr" ? "Tür" : "Type", render: (row) => locale === "tr" ? (row.type === "VERBAL" ? "Sözel" : "Sayısal") : row.type },
                   {
                     key: "count",
                     header: locale === "tr" ? "Soru Sayısı" : "Question Count",
@@ -564,7 +729,19 @@ export function QuestionnaireWorkspaceClient({
       {tab === "answers" ? (
         <Card>
           <CardHeader>
-            <CardTitle>{t("questionnaireAnswers")}</CardTitle>
+            <div className="flex items-center justify-between gap-3">
+              <CardTitle>{t("questionnaireAnswers")}</CardTitle>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => void fillAnswersFromAI()}
+                disabled={qaAiLoading || !selectedQuestions.length}
+              >
+                {qaAiLoading
+                  ? (locale === "tr" ? "Yükleniyor..." : "Loading...")
+                  : (locale === "tr" ? "AI ile Doldur" : "Fill with AI")}
+              </Button>
+            </div>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid gap-2 lg:grid-cols-3">
@@ -676,6 +853,179 @@ export function QuestionnaireWorkspaceClient({
             </div>
           </CardContent>
         </Card>
+      ) : null}
+
+      {showImportModal ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          onClick={() => setShowImportModal(false)}
+        >
+          <div
+            className="w-full max-w-lg rounded-lg border border-slate-200 bg-white p-6 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className="mb-1 text-base font-semibold">
+              {locale === "tr" ? "Excel'den Anket İçe Aktar" : "Import Questionnaire from Excel"}
+            </h2>
+            <p className="mb-4 text-xs text-slate-500">
+              {locale === "tr"
+                ? "Excel dosyanızda şu sütunlar olmalı: Bölüm, Alt Bölüm, Kod, Başlık, Soru Metni, Birim, Sahip Adı, Sahip Departman, Sahip E-posta, Yardımcı Bilgi, Örnek, Hatırlatıcı"
+                : "Your Excel file should have columns: Section, Subsection, Code, Title, Question Text, Unit, Owner Name, Owner Dept, Owner Email, Helper, Example, Reminder"}
+            </p>
+            <div className="space-y-3">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <label className="mb-1 block text-sm font-medium">
+                    {locale === "tr" ? "Anket Adı (TR)" : "Questionnaire Name (TR)"}
+                    <span className="text-red-500 ml-0.5">*</span>
+                  </label>
+                  <Input
+                    value={importNameTr}
+                    onChange={(e) => setImportNameTr(e.target.value)}
+                    placeholder={locale === "tr" ? "Anket adı" : "Questionnaire name"}
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-sm font-medium">
+                    {locale === "tr" ? "Anket Adı (EN)" : "Questionnaire Name (EN)"}
+                  </label>
+                  <Input
+                    value={importNameEn}
+                    onChange={(e) => setImportNameEn(e.target.value)}
+                    placeholder="Questionnaire name (EN)"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium">
+                  {locale === "tr" ? "Anket Türü" : "Questionnaire Type"}
+                </label>
+                <select
+                  className="h-9 w-full rounded-md border border-slate-300 px-3 text-sm"
+                  value={importType}
+                  onChange={(e) => setImportType(e.target.value as "VERBAL" | "NUMERIC")}
+                >
+                  <option value="VERBAL">{locale === "tr" ? "Sözel" : "Verbal"}</option>
+                  <option value="NUMERIC">{locale === "tr" ? "Sayısal" : "Numeric"}</option>
+                </select>
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium">
+                  {locale === "tr" ? "Excel Dosyası (.xlsx)" : "Excel File (.xlsx)"}
+                  <span className="text-red-500 ml-0.5">*</span>
+                </label>
+                <input
+                  type="file"
+                  accept=".xlsx,.xls"
+                  className="block w-full text-sm text-slate-600 file:mr-3 file:rounded-md file:border file:border-slate-300 file:bg-slate-50 file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-slate-700 hover:file:bg-slate-100"
+                  onChange={(e) => setImportFile(e.target.files?.[0] ?? null)}
+                />
+              </div>
+              <div className="flex items-center gap-2 text-xs text-slate-500">
+                <svg className="h-3.5 w-3.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+                </svg>
+                <button
+                  type="button"
+                  className="underline underline-offset-2 hover:text-slate-700"
+                  onClick={() => {
+                    const a = document.createElement("a");
+                    a.href = "/api/questionnaire/import";
+                    a.download = "anket-sablonu.xlsx";
+                    a.click();
+                  }}
+                >
+                  {locale === "tr" ? "Boş şablonu indir" : "Download blank template"}
+                </button>
+              </div>
+              {importError && (
+                <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-600">{importError}</p>
+              )}
+              <div className="flex gap-2 pt-1">
+                <Button
+                  onClick={() => void importFromExcel()}
+                  disabled={importLoading || !importNameTr.trim() || !importFile}
+                  className="flex-1"
+                >
+                  {importLoading
+                    ? locale === "tr" ? "İçe aktarılıyor..." : "Importing..."
+                    : locale === "tr" ? "İçe Aktar" : "Import"}
+                </Button>
+                <Button variant="outline" onClick={() => setShowImportModal(false)}>
+                  {locale === "tr" ? "Vazgeç" : "Cancel"}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {showCloneModal ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          onClick={() => setShowCloneModal(false)}
+        >
+          <div
+            className="w-full max-w-md rounded-lg border border-slate-200 bg-white p-6 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className="mb-4 text-base font-semibold">
+              {locale === "tr" ? "Taslaktan Yeni Anket Oluştur" : "Create New Questionnaire from Template"}
+            </h2>
+            <div className="space-y-3">
+              <div>
+                <label className="mb-1 block text-sm font-medium">
+                  {locale === "tr" ? "Şablon Anket" : "Template Questionnaire"}
+                </label>
+                <select
+                  className="h-9 w-full rounded-md border border-slate-300 px-3 text-sm"
+                  value={cloneSourceId}
+                  onChange={(e) => setCloneSourceId(e.target.value)}
+                >
+                  {questionnaires.map((q) => (
+                    <option key={q.id} value={q.id}>
+                      {locale === "tr" ? q.name_tr : q.name_en || q.name_tr}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium">
+                  {locale === "tr" ? "Yeni Anket Adı (TR)" : "New Questionnaire Name (TR)"}
+                </label>
+                <Input
+                  value={cloneNameTr}
+                  onChange={(e) => setCloneNameTr(e.target.value)}
+                  placeholder={locale === "tr" ? "Anket adı (TR)" : "Questionnaire name (TR)"}
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium">
+                  {locale === "tr" ? "Yeni Anket Adı (EN)" : "New Questionnaire Name (EN)"}
+                </label>
+                <Input
+                  value={cloneNameEn}
+                  onChange={(e) => setCloneNameEn(e.target.value)}
+                  placeholder={locale === "tr" ? "Anket adı (EN)" : "Questionnaire name (EN)"}
+                />
+              </div>
+              <div className="flex gap-2 pt-2">
+                <Button
+                  onClick={() => void cloneQuestionnaire()}
+                  disabled={cloneLoading || !cloneNameTr.trim()}
+                  className="flex-1"
+                >
+                  {cloneLoading
+                    ? locale === "tr" ? "Oluşturuluyor..." : "Creating..."
+                    : locale === "tr" ? "Oluştur" : "Create"}
+                </Button>
+                <Button variant="outline" onClick={() => setShowCloneModal(false)}>
+                  {locale === "tr" ? "Vazgeç" : "Cancel"}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
       ) : null}
 
       {tab === "dashboard" ? (

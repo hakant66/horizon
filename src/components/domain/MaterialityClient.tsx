@@ -34,6 +34,8 @@ export function MaterialityClient({
   const tr = locale === "tr";
   const [rows, setRows] = useState<Topic[]>(topics);
   const [message, setMessage] = useState("");
+  const [aiLoading, setAiLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   const subsector = sasbSector ? ALL_SASB_SUBSECTORS.find((s) => s.sics === sasbSector) : null;
 
@@ -53,7 +55,9 @@ export function MaterialityClient({
     setRows((prev) => [...prev, ...newRows]);
   }
 
-  function updateScore(id: string, field: keyof Topic, value: number) {
+  function updateScore(id: string, field: keyof Topic, rawValue: number) {
+    // Clamp in JS — HTML min/max is advisory only and can be bypassed by typing.
+    const value = Math.min(5, Math.max(1, Math.round(rawValue)));
     setRows((prev) =>
       prev.map((row) =>
         row.id === id
@@ -70,29 +74,91 @@ export function MaterialityClient({
     );
   }
 
+  async function fillFromAI() {
+    setAiLoading(true);
+    setMessage("");
+    try {
+      const res = await fetch("/api/ai/rag", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ target: "materiality" }),
+      });
+      if (!res.ok) {
+        const err = (await res.json()) as { error?: string };
+        setMessage(err.error ?? (tr ? "AI doldurulamadı" : "AI fill failed"));
+        return;
+      }
+      type AiTopic = { name: string; financialImpactScore: number; impactSeverityScore: number; likelihoodScore: number; stakeholderConcernScore: number };
+      const data = (await res.json()) as { topics: AiTopic[] };
+      if (!data.topics?.length) {
+        setMessage(tr ? "AI herhangi bir konu bulamadı." : "AI could not identify any topics.");
+        return;
+      }
+      const clamp = (n: number) => Math.min(5, Math.max(1, Math.round(n)));
+      const incoming: Topic[] = data.topics.map((t, i) => ({
+        id: `ai-${i}`,
+        name: t.name,
+        financialImpactScore: clamp(t.financialImpactScore),
+        impactSeverityScore: clamp(t.impactSeverityScore),
+        likelihoodScore: clamp(t.likelihoodScore),
+        stakeholderConcernScore: clamp(t.stakeholderConcernScore),
+        isMaterial:
+          clamp(t.financialImpactScore) >= 4 ||
+          clamp(t.impactSeverityScore) >= 4 ||
+          clamp(t.stakeholderConcernScore) >= 4,
+      }));
+      // Merge: update existing topics by name, add new ones
+      setRows((prev) => {
+        const updated = prev.map((row) => {
+          const match = incoming.find((t) => t.name.toLowerCase() === row.name.toLowerCase());
+          return match ? { ...row, ...match, id: row.id } : row;
+        });
+        const existingNames = new Set(prev.map((r) => r.name.toLowerCase()));
+        const newTopics = incoming.filter((t) => !existingNames.has(t.name.toLowerCase()));
+        return [...updated, ...newTopics];
+      });
+      setMessage(
+        tr
+          ? `AI ${data.topics.length} konu önerdi. Lütfen kontrol edip kaydedin.`
+          : `AI suggested ${data.topics.length} topics. Please review and save.`,
+      );
+    } catch {
+      setMessage(tr ? "AI servisine ulaşılamadı" : "Could not reach AI service");
+    } finally {
+      setAiLoading(false);
+    }
+  }
+
   async function saveAll() {
-    const responses = await Promise.all(
-      rows.map((row) =>
-        fetch("/api/materiality", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            reportingPeriodId,
-            name: row.name,
-            category: "ESG",
-            financialImpactScore: row.financialImpactScore,
-            impactSeverityScore: row.impactSeverityScore,
-            likelihoodScore: row.likelihoodScore,
-            stakeholderConcernScore: row.stakeholderConcernScore,
+    if (saving) return;
+    setSaving(true);
+    setMessage("");
+    try {
+      const responses = await Promise.all(
+        rows.map((row) =>
+          fetch("/api/materiality", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              reportingPeriodId,
+              name: row.name,
+              category: "ESG",
+              financialImpactScore: row.financialImpactScore,
+              impactSeverityScore: row.impactSeverityScore,
+              likelihoodScore: row.likelihoodScore,
+              stakeholderConcernScore: row.stakeholderConcernScore,
+            }),
           }),
-        }),
-      ),
-    );
-    setMessage(
-      responses.every((r) => r.ok)
-        ? tr ? "Değerlendirme kaydedildi" : "Assessment saved"
-        : tr ? "Bazı konular kaydedilemedi" : "Some topics failed to save",
-    );
+        ),
+      );
+      setMessage(
+        responses.every((r) => r.ok)
+          ? tr ? "Değerlendirme kaydedildi" : "Assessment saved"
+          : tr ? "Bazı konular kaydedilemedi" : "Some topics failed to save",
+      );
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
@@ -186,7 +252,14 @@ export function MaterialityClient({
         ]}
       />
 
-      <Button onClick={saveAll}>{tr ? "Değerlendirmeyi Kaydet" : "Save Assessment"}</Button>
+      <div className="flex flex-wrap items-center gap-3">
+        <Button onClick={saveAll} disabled={saving}>
+          {saving ? (tr ? "Kaydediliyor…" : "Saving…") : (tr ? "Değerlendirmeyi Kaydet" : "Save Assessment")}
+        </Button>
+        <Button variant="outline" onClick={() => void fillFromAI()} disabled={aiLoading}>
+          {aiLoading ? (tr ? "Yükleniyor..." : "Loading...") : (tr ? "AI ile Doldur" : "Fill with AI")}
+        </Button>
+      </div>
 
       <MaterialityMatrix
         points={rows.map((row) => ({

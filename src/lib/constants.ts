@@ -1,5 +1,6 @@
 export const NAV_ITEMS = [
   { href: "/dashboard",       labelKey: "home",           icon: "LayoutDashboard" },
+  { href: "/knowledge-base",  labelKey: "knowledgeBase",  icon: "BookOpen" },
   { href: "/setup",           labelKey: "setup",          icon: "Settings2" },
   { href: "/esg-summary",     labelKey: "esgSummary",     icon: "ClipboardList" },
   { href: "/questionnaire",   labelKey: "questionnaire",  icon: "MessageSquare" },

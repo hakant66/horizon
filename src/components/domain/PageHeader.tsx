@@ -24,12 +24,14 @@ export function PageHeader({
   const resolvedDescription = locale === "tr" ? descriptionTr || description : descriptionEn || description;
 
   return (
-    <div className="mb-4 flex items-start justify-between gap-3">
-      <div>
-        <h2 className="text-xl font-semibold text-slate-900">{resolvedTitle}</h2>
-        {resolvedDescription ? <p className="mt-1 text-sm text-slate-600">{resolvedDescription}</p> : null}
+    <div className="flex items-start justify-between gap-4 border-b border-slate-200 pb-5 mb-6">
+      <div className="min-w-0">
+        <h1 className="text-xl font-bold tracking-tight text-slate-900">{resolvedTitle}</h1>
+        {resolvedDescription && (
+          <p className="mt-1 text-sm text-slate-500 leading-relaxed">{resolvedDescription}</p>
+        )}
       </div>
-      {actions}
+      {actions && <div className="shrink-0">{actions}</div>}
     </div>
   );
 }

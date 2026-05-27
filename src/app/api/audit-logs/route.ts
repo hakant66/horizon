@@ -4,7 +4,7 @@ import { apiError, apiOk } from "@/lib/api";
 
 export async function GET(request: Request) {
   try {
-    const user = await requireRole(["ADMIN", "SUSTAINABILITY_MANAGER", "FINANCE_REVIEWER", "AUDITOR"]);
+    const user = await requireRole(["ADMIN", "SUSTAINABILITY_MANAGER", "FINANCE_REVIEWER", "AUDITOR", "HORIZON_CONSULTANT"]);
     const { searchParams } = new URL(request.url);
     const action = searchParams.get("action") || undefined;
     const entityType = searchParams.get("entityType") || undefined;

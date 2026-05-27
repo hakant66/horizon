@@ -6,7 +6,7 @@ import { createAuditLog } from "@/lib/audit";
 
 export async function POST(request: Request) {
   try {
-    const user = await requireRole(["ADMIN", "SUSTAINABILITY_MANAGER", "FINANCE_REVIEWER", "AUDITOR"]);
+    const user = await requireRole(["ADMIN", "SUSTAINABILITY_MANAGER", "FINANCE_REVIEWER", "AUDITOR", "HORIZON_CONSULTANT"]);
     const payload = commentSchema.parse(await request.json());
 
     const submission = await prisma.certificationSubmission.findFirstOrThrow({

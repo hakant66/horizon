@@ -20,7 +20,9 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
 
   const setLocale = (next: Locale) => {
     setLocaleState(next);
-    window.localStorage.setItem("horizon-locale", next);
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem("horizon-locale", next);
+    }
   };
 
   const value = useMemo(

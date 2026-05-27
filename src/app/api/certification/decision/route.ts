@@ -6,7 +6,7 @@ import { createAuditLog } from "@/lib/audit";
 
 export async function POST(request: Request) {
   try {
-    const user = await requireRole(["AUDITOR"]);
+    const user = await requireRole(["AUDITOR", "HORIZON_CONSULTANT"]);
     const { submissionId, status, decisionNotes } = (await request.json()) as {
       submissionId: string;
       status: CertificationStatus;

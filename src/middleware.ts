@@ -20,6 +20,8 @@ export const config = {
     "/certification/:path*",
     "/audit-trail/:path*",
     "/settings/:path*",
+    "/knowledge-base/:path*",
+    "/esg-summary/:path*",
     "/api/:path*",
   ],
 };
