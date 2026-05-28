@@ -13,6 +13,7 @@
     "test:e2e": "playwright test",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
+    "prisma:enable-vector": "tsx prisma/enable-vector.ts",
     "prisma:setup-vector": "tsx prisma/setup-vector.ts",
     "prisma:seed": "tsx prisma/seed-karel.ts",
     "db:push": "prisma db push"

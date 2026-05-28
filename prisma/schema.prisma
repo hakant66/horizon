@@ -857,8 +857,9 @@ model KnowledgeBaseChunk {
   content        String
   chunkIndex     Int
   tokenCount     Int                          @default(0)
-  embedding      Unsupported("vector(1536)")?
-  createdAt      DateTime                     @default(now())
+  // embedding vector(1536) — managed outside Prisma via prisma/setup-vector.ts
+  // (pgvector extension must exist before db push; column added with ADD COLUMN IF NOT EXISTS)
+  createdAt      DateTime @default(now())
 
   organization Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   document     KnowledgeBaseDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
